@@ -61,8 +61,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null)
   }
 
+  /** Updates the in-memory user and persists it (e.g. after onboarding). */
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser)
+    if (token) {
+      saveAuthData({ token, user: updatedUser }).catch((error) => {
+        console.warn('Failed to persist updated user', error)
+      })
+    }
+  }
+
   const value = useMemo(
-    () => ({ user, token, isLoading, signIn, signUp, signInWithSocial, signOut }),
+    () => ({ user, token, isLoading, signIn, signUp, signInWithSocial, signOut, updateUser }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, token, isLoading]
   )
 

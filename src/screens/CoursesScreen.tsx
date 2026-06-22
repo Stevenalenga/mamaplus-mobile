@@ -10,6 +10,11 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useNavigation } from '@react-navigation/native'
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { UserStackParamList } from '../types'
+
+type NavProp = NativeStackNavigationProp<UserStackParamList>
 
 type CourseCategory = 'All' | 'Maternal' | 'Infant' | 'Nutrition' | 'Mental Health'
 
@@ -69,6 +74,7 @@ const SAMPLE_COURSES = [
 export default function CoursesScreen() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<CourseCategory>('All')
+  const navigation = useNavigation<NavProp>()
 
   const filtered = SAMPLE_COURSES.filter((c) => {
     const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase())
@@ -150,7 +156,10 @@ export default function CoursesScreen() {
                     </Text>
                   </View>
                 )}
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: course.accent }]}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: course.accent }]}
+                  onPress={() => navigation.navigate('CourseDetail', { courseId: course.id, courseTitle: course.title })}
+                >
                   <Text style={styles.actionBtnText}>
                     {course.progress === 100 ? 'Review' : 'Continue'}
                   </Text>

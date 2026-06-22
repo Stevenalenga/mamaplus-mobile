@@ -1,12 +1,18 @@
 import { useMemo } from 'react'
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useNavigation } from '@react-navigation/native'
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useAuth } from '../context/AuthContext'
 import { ROLE_DISPLAY_NAMES, ROLE_DASHBOARD_LABELS } from '../constants'
 import MamaPlusLogo from '../components/MamaPlusLogo'
+import { UserStackParamList } from '../types'
+
+type NavProp = NativeStackNavigationProp<UserStackParamList>
 
 export default function HomeScreen() {
   const { user } = useAuth()
+  const navigation = useNavigation<NavProp>()
 
   const roleLabel = useMemo(() => {
     if (!user) return 'Guest'
@@ -38,10 +44,14 @@ export default function HomeScreen() {
         {/* Quick stats */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsRow}>
-          <View style={styles.actionCard}>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('Tabs', undefined as any)}
+            activeOpacity={0.8}
+          >
             <Text style={styles.actionIcon}>📚</Text>
             <Text style={styles.actionLabel}>Browse{'\n'}Courses</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.actionCard}>
             <Text style={styles.actionIcon}>📈</Text>
             <Text style={styles.actionLabel}>Track{'\n'}Progress</Text>

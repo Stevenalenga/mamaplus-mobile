@@ -25,7 +25,7 @@ function MicrosoftSignInButtonInner({
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
-      clientId: extra.expoMicrosoftClientId || undefined,
+      clientId: extra.expoMicrosoftClientId ?? '',
       scopes: ['openid', 'profile', 'User.Read'],
       redirectUri,
       responseType: AuthSession.ResponseType.Token

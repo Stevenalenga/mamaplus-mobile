@@ -77,21 +77,27 @@ export async function clearAuthData() {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}) {
+async function request<T>(path: string, options: RequestInit = {}, token?: string | null) {
   const url = `${API_BASE_URL}${path}`
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 15000)
 
   let response: Response
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   try {
     response = await fetch(url, {
       ...options,
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      }
+      headers,
     })
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -125,6 +131,8 @@ export function getLoginErrorMessage(error: unknown): string {
   return 'Unable to sign in'
 }
 
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
 export async function signInRequest(email: string, password: string) {
   return request<{ success: boolean; data: AuthPayload }>(
     '/api/users/login',
@@ -152,5 +160,241 @@ export async function socialSignIn(provider: 'google' | 'microsoft', tokens: { i
       method: 'POST',
       body: JSON.stringify({ provider, ...tokens })
     }
+  )
+}
+
+// ─── Onboarding ──────────────────────────────────────────────────────────────
+
+export async function onboardUser(
+  token: string,
+  role: 'USER' | 'AGENCY' | 'INSTRUCTOR',
+  gender?: 'MALE' | 'FEMALE'
+) {
+  return request<{ success: boolean; data: any }>(
+    '/api/users/onboard',
+    {
+      method: 'POST',
+      body: JSON.stringify({ role, gender }),
+    },
+    token
+  )
+}
+
+// ─── Courses ─────────────────────────────────────────────────────────────────
+
+export async function fetchCourses(token: string, mine = false) {
+  const qs = mine ? '?mine=true' : ''
+  return request<{ success: boolean; data: any[] }>(
+    `/api/courses${qs}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchCourse(token: string, courseId: string) {
+  return request<{ success: boolean; data: any }>(
+    `/api/courses/${courseId}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function createCourse(token: string, payload: {
+  title: string
+  description: string
+  category?: string
+  level?: string
+  duration?: number
+  priceUSD?: number
+  priceKES?: number
+  currency?: string
+  isPublished?: boolean
+}) {
+  return request<{ success: boolean; data: any }>(
+    '/api/courses',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        category: 'Educator Created',
+        level: 'BEGINNER',
+        duration: 0,
+        priceUSD: 0,
+        priceKES: 0,
+        currency: 'USD',
+        isPublished: false,
+        ...payload,
+      }),
+    },
+    token
+  )
+}
+
+export async function updateCourse(token: string, courseId: string, payload: {
+  title?: string
+  description?: string
+  isPublished?: boolean
+}) {
+  return request<{ success: boolean; data: any }>(
+    `/api/courses/${courseId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+    token
+  )
+}
+
+export async function deleteCourse(token: string, courseId: string) {
+  return request<{ success: boolean }>(
+    `/api/courses/${courseId}`,
+    { method: 'DELETE' },
+    token
+  )
+}
+
+export async function publishCourse(token: string, courseId: string) {
+  return request<{ success: boolean }>(
+    `/api/courses/${courseId}/publish`,
+    { method: 'POST' },
+    token
+  )
+}
+
+export async function unpublishCourse(token: string, courseId: string) {
+  return request<{ success: boolean }>(
+    `/api/courses/${courseId}/unpublish`,
+    { method: 'POST' },
+    token
+  )
+}
+
+// ─── Modules ─────────────────────────────────────────────────────────────────
+
+export async function addModule(token: string, courseId: string, payload: { title: string; isMilestone?: boolean }) {
+  return request<{ success: boolean; data: any }>(
+    `/api/courses/${courseId}/modules`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token
+  )
+}
+
+export async function updateModule(token: string, courseId: string, moduleId: string, payload: { title?: string; isMilestone?: boolean }) {
+  return request<{ success: boolean; data: any }>(
+    `/api/courses/${courseId}/modules/${moduleId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+    token
+  )
+}
+
+export async function deleteModule(token: string, courseId: string, moduleId: string) {
+  return request<{ success: boolean }>(
+    `/api/courses/${courseId}/modules/${moduleId}`,
+    { method: 'DELETE' },
+    token
+  )
+}
+
+// ─── Lessons ─────────────────────────────────────────────────────────────────
+
+export async function addLesson(
+  token: string,
+  courseId: string,
+  moduleId: string,
+  payload: { title: string; type: string; url?: string; isMilestone?: boolean; duration?: number }
+) {
+  return request<{ success: boolean; data: any }>(
+    `/api/courses/${courseId}/modules/${moduleId}/lessons`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ duration: 0, ...payload }),
+    },
+    token
+  )
+}
+
+export async function deleteLesson(token: string, courseId: string, moduleId: string, lessonId: string) {
+  return request<{ success: boolean }>(
+    `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`,
+    { method: 'DELETE' },
+    token
+  )
+}
+
+// ─── Enrollments ─────────────────────────────────────────────────────────────
+
+export async function fetchEnrollments(token: string) {
+  return request<{ success: boolean; data: any[] }>(
+    '/api/enrollments',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchEnrollment(token: string, courseId: string) {
+  return request<{ success: boolean; data: any }>(
+    `/api/enrollments/${courseId}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+// ─── Agency ──────────────────────────────────────────────────────────────────
+
+export async function fetchAgencyStats(token: string) {
+  return request<{ success: boolean; data: any }>(
+    '/api/agencies/stats',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchAvailableCaregivers(token: string) {
+  return request<{ success: boolean; data: any[] }>(
+    '/api/agencies/caregivers',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function recruitCaregiver(token: string, caregiverId: string) {
+  return request<{ success: boolean; data: any }>(
+    '/api/agencies/caregivers',
+    {
+      method: 'POST',
+      body: JSON.stringify({ caregiverId }),
+    },
+    token
+  )
+}
+
+export async function searchCaregivers(token: string, query: string) {
+  return request<{ success: boolean; data: any[] }>(
+    `/api/agencies/search?q=${encodeURIComponent(query)}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+
+export async function fetchAdminUsers(token: string) {
+  return request<{ success: boolean; data: any[] }>(
+    '/api/admin/users',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchAdminStats(token: string) {
+  return request<{ success: boolean; data: any }>(
+    '/api/admin/stats',
+    { method: 'GET' },
+    token
   )
 }
