@@ -25,6 +25,11 @@ export default {
         backgroundColor: '#E6F4FE'
       }
     },
+    androidStatusBar: {
+      barStyle: 'dark-content',
+      backgroundColor: '#f8fafc',
+      translucent: false
+    },
     web: {
       favicon: './assets/favicon.png'
     },
@@ -41,6 +46,9 @@ export default {
       ]
     ],
     extra: {
+      eas: {
+        projectId: 'c6718901-59ba-4ec4-8da9-42d1fd8e53a1'
+      },
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000',
       expoGoogleClientId:
         process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||

@@ -1,5 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { Platform } from 'react-native'
+import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthProvider, useAuth } from './src/context/AuthContext'
 import LoadingScreen from './src/screens/LoadingScreen'
@@ -15,6 +17,19 @@ import { RootStackParamList } from './src/types'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 
+const STATUS_BAR_BG = '#f8fafc'
+
+const stackScreenOptions = {
+  headerShown: false,
+  statusBarStyle: 'dark' as const,
+  ...(Platform.OS === 'android'
+    ? {
+        statusBarBackgroundColor: STATUS_BAR_BG,
+        statusBarTranslucent: false,
+      }
+    : {}),
+}
+
 function AppNavigator() {
   const { user, isLoading } = useAuth()
 
@@ -24,7 +39,7 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={stackScreenOptions}>
         {!user ? (
           // ── Unauthenticated ───────────────────────────────────────────────
           <>
@@ -58,6 +73,7 @@ function AppNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
+      <StatusBar style="dark" />
       <AuthProvider>
         <AppNavigator />
       </AuthProvider>

@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext'
-import { searchCaregivers, recruitCaregiver } from '../../api/client'
+import { searchCaregivers, recruitCaregiver, fetchCourses, sponsorCaregiver } from '../../api/client'
 
 type Caregiver = {
   id: string
@@ -49,6 +49,35 @@ export default function SearchCaregiversScreen() {
     }
   }
 
+  async function handleSponsor(cg: Caregiver) {
+    if (!token) return
+    try {
+      const coursesRes = await fetchCourses(token)
+      const courses = (coursesRes.success ? coursesRes.data : []).filter((c: any) => c.isPublished !== false)
+      if (courses.length === 0) {
+        Alert.alert('No courses', 'No published courses available to sponsor.')
+        return
+      }
+      const buttons = courses.slice(0, 5).map((c: any) => ({
+        text: c.title,
+        onPress: async () => {
+          try {
+            await sponsorCaregiver(token, cg.id, c.id)
+            Alert.alert('Sponsored!', `${cg.name || 'Caregiver'} enrolled in "${c.title}".`)
+          } catch (err) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Sponsorship failed.')
+          }
+        },
+      }))
+      Alert.alert('Sponsor Course', `Pick a course for ${cg.name || cg.email}`, [
+        ...buttons,
+        { text: 'Cancel', style: 'cancel' },
+      ])
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load courses.')
+    }
+  }
+
   async function handleRecruit(cg: Caregiver) {
     if (!token) return
     Alert.alert(
@@ -64,6 +93,10 @@ export default function SearchCaregiversScreen() {
               const res = await recruitCaregiver(token, cg.id)
               if (res.success) {
                 setRecruitedIds((prev) => new Set([...prev, cg.id]))
+                Alert.alert('Recruited', 'Caregiver added. Would you like to sponsor a course?', [
+                  { text: 'Later', style: 'cancel' },
+                  { text: 'Sponsor', onPress: () => handleSponsor(cg) },
+                ])
               }
             } catch (err) {
               Alert.alert('Error', err instanceof Error ? err.message : 'Failed to recruit.')
@@ -152,8 +185,13 @@ export default function SearchCaregiversScreen() {
               </View>
 
               {recruited ? (
-                <View style={styles.recruitedBadge}>
-                  <Text style={styles.recruitedText}>✓ Recruited</Text>
+                <View style={styles.recruitedActions}>
+                  <View style={styles.recruitedBadge}>
+                    <Text style={styles.recruitedText}>✓ Recruited</Text>
+                  </View>
+                  <TouchableOpacity style={styles.sponsorBtn} onPress={() => handleSponsor(cg)}>
+                    <Text style={styles.sponsorBtnText}>Sponsor</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -266,7 +304,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginLeft: 8,
   },
   recruitedText: { color: '#16a34a', fontWeight: '700', fontSize: 12 },
+  recruitedActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 8 },
+  sponsorBtn: {
+    backgroundColor: '#16a34a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  sponsorBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 })

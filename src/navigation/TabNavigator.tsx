@@ -1,11 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { Platform, StyleSheet, Text, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 import HomeScreen from '../screens/HomeScreen'
 import CoursesScreen from '../screens/CoursesScreen'
-import ProfileScreen from '../screens/ProfileScreen'
+import ProfileStackNavigator from './ProfileStackNavigator'
 import CourseDetailScreen from '../screens/CourseDetailScreen'
 import { UserTabParamList, UserStackParamList } from '../types'
+import { useTabBarScreenOptions } from './useTabBarScreenOptions'
 
 const Tab = createBottomTabNavigator<UserTabParamList>()
 const Stack = createNativeStackNavigator<UserStackParamList>()
@@ -66,20 +67,13 @@ const icon = StyleSheet.create({
 })
 
 function UserTabs() {
+  const screenOptions = useTabBarScreenOptions()
+
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: PRIMARY,
-        tabBarInactiveTintColor: INACTIVE,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.label,
-        tabBarItemStyle: styles.tabItem,
-      }}
-    >
+    <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ focused }) => <HomeIcon focused={focused} /> }} />
       <Tab.Screen name="Courses" component={CoursesScreen} options={{ tabBarIcon: ({ focused }) => <CoursesIcon focused={focused} /> }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: ({ focused }) => <ProfileIcon focused={focused} /> }} />
+      <Tab.Screen name="Profile" component={ProfileStackNavigator} options={{ tabBarIcon: ({ focused }) => <ProfileIcon focused={focused} /> }} />
     </Tab.Navigator>
   )
 }
@@ -87,26 +81,20 @@ function UserTabs() {
 /** USER navigator: tabs + course detail stack */
 export default function UserNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        statusBarStyle: 'dark',
+        ...(Platform.OS === 'android'
+          ? {
+              statusBarBackgroundColor: '#f8fafc',
+              statusBarTranslucent: false,
+            }
+          : {}),
+      }}
+    >
       <Stack.Screen name="Tabs" component={UserTabs} />
       <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
     </Stack.Navigator>
   )
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    height: Platform.OS === 'ios' ? 84 : 64,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    paddingTop: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 -2px 12px rgba(15,23,42,0.06)' } as any,
-      default: { shadowColor: '#0f172a', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 8 },
-    }),
-  },
-  label: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  tabItem: { paddingTop: 4 },
-})

@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext'
-import { fetchAdminUsers, fetchCourses } from '../../api/client'
+import { fetchAdminUsers, fetchCourses, updateAdminUserRole } from '../../api/client'
 import { ROLE_DISPLAY_NAMES } from '../../constants'
 
 type AdminUser = {
@@ -41,7 +41,7 @@ export default function AdminHomeScreen() {
       ])
 
       if (usersRes.status === 'fulfilled' && usersRes.value.success) {
-        setUsers(usersRes.value.data)
+        setUsers(usersRes.value.data.users ?? [])
       }
       if (coursesRes.status === 'fulfilled' && coursesRes.value.success) {
         setTotalCourses(coursesRes.value.data.length)
@@ -61,7 +61,30 @@ export default function AdminHomeScreen() {
     return acc
   }, {})
 
-  const verifiedCount = users.filter((u) => u.isVerified).length
+  const verifiedCount = users.filter((u) => (u as any).isVerified).length
+
+  function changeRole(target: AdminUser) {
+    if (!token || target.id === user?.id) return
+    const roles = ['USER', 'AGENCY', 'INSTRUCTOR', 'ADMIN_ASSISTANT', 'ADMIN']
+    Alert.alert(
+      'Change role',
+      `${target.name || target.email}`,
+      [
+        ...roles.map((role) => ({
+          text: ROLE_DISPLAY_NAMES[role] ?? role,
+          onPress: async () => {
+            try {
+              await updateAdminUserRole(token, target.id, role)
+              loadData()
+            } catch (err) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update role.')
+            }
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    )
+  }
 
   if (loading) {
     return (
@@ -116,7 +139,7 @@ export default function AdminHomeScreen() {
         {/* Recent users */}
         <Text style={styles.sectionTitle}>Recent Users</Text>
         {users.slice(0, 10).map((u) => (
-          <View key={u.id} style={styles.userRow}>
+          <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => changeRole(u)} activeOpacity={0.8}>
             <View style={styles.userAvatar}>
               <Text style={styles.userAvatarText}>
                 {(u.name || u.email)[0].toUpperCase()}
@@ -134,7 +157,7 @@ export default function AdminHomeScreen() {
                 <Text style={styles.verifiedDot}>✓</Text>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
         {users.length > 10 && (

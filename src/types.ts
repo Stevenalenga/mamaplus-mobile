@@ -66,6 +66,14 @@ export type UserStackParamList = {
   CourseDetail: { courseId: string; courseTitle: string }
 }
 
+export type ProfileStackParamList = {
+  ProfileMain: undefined
+  EditProfile: undefined
+  ChangePassword: undefined
+  AgencyCaregivers: undefined
+  Contact: undefined
+}
+
 // ─── AGENCY ─────────────────────────────────────────────────────────────────
 
 export type AgencyTabParamList = {

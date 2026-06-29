@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,7 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useAuth } from '../context/AuthContext'
-import { fetchCourse, fetchEnrollment } from '../api/client'
+import {
+  createEnrollment,
+  fetchCourse,
+  fetchEnrollments,
+  fetchProgress,
+  updateLessonProgress,
+} from '../api/client'
 import { UserStackParamList } from '../types'
 
 type Props = NativeStackScreenProps<UserStackParamList, 'CourseDetail'>
@@ -44,64 +52,107 @@ export default function CourseDetailScreen({ route, navigation }: Props) {
   const { token } = useAuth()
 
   const [course, setCourse] = useState<CourseDetail | null>(null)
-  const [enrollment, setEnrollment] = useState<{ progress: number; completedResources: string[] } | null>(null)
+  const [enrollment, setEnrollment] = useState<{ progress: number; enrolled: boolean } | null>(null)
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
+  const [togglingLesson, setTogglingLesson] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    if (!token) return
+    setLoading(true)
+    setError(null)
+    try {
+      const [courseRes, enrollmentsRes, progressRes] = await Promise.allSettled([
+        fetchCourse(token, courseId),
+        fetchEnrollments(token),
+        fetchProgress(token),
+      ])
+
+      if (courseRes.status === 'fulfilled' && courseRes.value.success) {
+        const raw = courseRes.value.data
+        const mapped: CourseDetail = {
+          id: raw.id,
+          title: raw.title,
+          description: raw.description,
+          status: raw.isPublished ? 'PUBLISHED' : 'DRAFT',
+          modules: (raw.modules || []).map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            isMilestone: false,
+            lessons: (m.lessons || []).map((l: any) => ({
+              id: l.id,
+              title: l.title,
+              type: l.content || 'video',
+              url: l.videoUrl || undefined,
+              isMilestone: false,
+            })),
+          })),
+        }
+        setCourse(mapped)
+        setExpandedModules(new Set(mapped.modules.map((m) => m.id)))
+      } else {
+        setError('Failed to load course details.')
+      }
+
+      if (enrollmentsRes.status === 'fulfilled' && enrollmentsRes.value.success) {
+        const match = enrollmentsRes.value.data.find((e: any) => e.courseId === courseId)
+        if (match) {
+          setEnrollment({ progress: match.progress ?? 0, enrolled: true })
+        } else {
+          setEnrollment({ progress: 0, enrolled: false })
+        }
+      }
+
+      if (progressRes.status === 'fulfilled' && progressRes.value.success) {
+        const entries = Array.isArray(progressRes.value.data) ? progressRes.value.data : []
+        const completed = new Set<string>(
+          entries
+            .filter((entry: any) => entry.isCompleted && entry.lesson?.module?.courseId === courseId)
+            .map((entry: any) => entry.lessonId as string)
+        )
+        setCompletedLessonIds(completed)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [courseId, token])
 
   useEffect(() => {
-    if (!token) return
-
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const [courseRes, enrollmentRes] = await Promise.allSettled([
-          fetchCourse(token!, courseId),
-          fetchEnrollment(token!, courseId),
-        ])
-
-        if (courseRes.status === 'fulfilled' && courseRes.value.success) {
-          const raw = courseRes.value.data
-          const mapped: CourseDetail = {
-            id: raw.id,
-            title: raw.title,
-            description: raw.description,
-            status: raw.isPublished ? 'PUBLISHED' : 'DRAFT',
-            modules: (raw.modules || []).map((m: any) => ({
-              id: m.id,
-              title: m.title,
-              isMilestone: false,
-              lessons: (m.lessons || []).map((l: any) => ({
-                id: l.id,
-                title: l.title,
-                type: l.content || 'video',
-                url: l.videoUrl || undefined,
-                isMilestone: false,
-              })),
-            })),
-          }
-          setCourse(mapped)
-          // expand all modules by default
-          setExpandedModules(new Set(mapped.modules.map((m) => m.id)))
-        } else if (courseRes.status === 'rejected') {
-          setError('Failed to load course details.')
-        }
-
-        if (enrollmentRes.status === 'fulfilled' && enrollmentRes.value.success) {
-          const e = enrollmentRes.value.data
-          setEnrollment({
-            progress: e.progress || 0,
-            completedResources: e.completedResources || [],
-          })
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
     load()
-  }, [courseId, token])
+  }, [load])
+
+  async function handleEnroll() {
+    if (!token) return
+    try {
+      await createEnrollment(token, courseId)
+      Alert.alert('Enrolled!', 'You can now start this course.')
+      load()
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Enrollment failed.')
+    }
+  }
+
+  async function toggleLessonComplete(lesson: Lesson) {
+    if (!token || !enrollment?.enrolled) return
+    const completed = completedLessonIds.has(lesson.id)
+    setTogglingLesson(lesson.id)
+    try {
+      await updateLessonProgress(token, lesson.id, !completed)
+      await load()
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update progress.')
+    } finally {
+      setTogglingLesson(null)
+    }
+  }
+
+  function openLesson(lesson: Lesson) {
+    if (lesson.url) {
+      Linking.openURL(lesson.url).catch(() => Alert.alert('Error', 'Could not open resource.'))
+    }
+  }
 
   function toggleModule(id: string) {
     setExpandedModules((prev) => {
@@ -156,24 +207,25 @@ export default function CourseDetailScreen({ route, navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Progress card */}
-        {enrollment && (
+        {enrollment?.enrolled && (
           <View style={styles.progressCard}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>Your Progress</Text>
               <Text style={styles.progressPct}>{enrollment.progress}%</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${enrollment.progress}%` as any },
-                ]}
-              />
+              <View style={[styles.progressFill, { width: `${enrollment.progress}%` as any }]} />
             </View>
             <Text style={styles.progressSub}>
               {totalLessons} lesson{totalLessons !== 1 ? 's' : ''} · {course.modules.length} module{course.modules.length !== 1 ? 's' : ''}
             </Text>
           </View>
+        )}
+
+        {enrollment && !enrollment.enrolled && (
+          <TouchableOpacity style={styles.enrollBtn} onPress={handleEnroll}>
+            <Text style={styles.enrollBtnText}>Enroll in this course</Text>
+          </TouchableOpacity>
         )}
 
         {/* Description */}
@@ -222,12 +274,15 @@ export default function CourseDetailScreen({ route, navigation }: Props) {
                       <Text style={styles.noLessons}>No lessons yet.</Text>
                     ) : (
                       mod.lessons.map((lesson, lIdx) => {
-                        const completed =
-                          enrollment?.completedResources?.includes(lesson.id) ?? false
+                        const completed = completedLessonIds.has(lesson.id)
                         return (
-                          <View
+                          <TouchableOpacity
                             key={lesson.id}
                             style={[styles.lessonRow, lIdx < mod.lessons.length - 1 && styles.lessonBorder]}
+                            onPress={() => enrollment?.enrolled && openLesson(lesson)}
+                            onLongPress={() => enrollment?.enrolled && toggleLessonComplete(lesson)}
+                            disabled={togglingLesson === lesson.id}
+                            activeOpacity={0.8}
                           >
                             <View style={[styles.lessonIcon, completed && styles.lessonIconDone]}>
                               <Text style={styles.lessonIconText}>
@@ -246,7 +301,7 @@ export default function CourseDetailScreen({ route, navigation }: Props) {
                                 <Text style={styles.doneBadgeText}>Done</Text>
                               </View>
                             )}
-                          </View>
+                          </TouchableOpacity>
                         )
                       })
                     )}
@@ -319,6 +374,14 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', backgroundColor: '#ffffff', borderRadius: 4 },
   progressSub: { color: '#bfdbfe', fontSize: 13 },
+  enrollBtn: {
+    backgroundColor: '#2563eb',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  enrollBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   descCard: {
     backgroundColor: '#ffffff',
     borderRadius: 14,

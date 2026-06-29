@@ -1,15 +1,13 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { Platform, StyleSheet, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import AdminHomeScreen from '../screens/admin/AdminHomeScreen'
 import AdminCoursesScreen from '../screens/admin/AdminCoursesScreen'
 import AdminSchoolsScreen from '../screens/admin/AdminSchoolsScreen'
-import ProfileScreen from '../screens/ProfileScreen'
+import ProfileStackNavigator from './ProfileStackNavigator'
 import { AdminTabParamList } from '../types'
+import { useTabBarScreenOptions } from './useTabBarScreenOptions'
 
 const Tab = createBottomTabNavigator<AdminTabParamList>()
-
-const PRIMARY = '#2563eb'
-const INACTIVE = '#94a3b8'
 
 function icon(emoji: string, focused: boolean) {
   return (
@@ -20,17 +18,10 @@ function icon(emoji: string, focused: boolean) {
 }
 
 export default function AdminNavigator() {
+  const screenOptions = useTabBarScreenOptions()
+
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: PRIMARY,
-        tabBarInactiveTintColor: INACTIVE,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.label,
-        tabBarItemStyle: styles.tabItem,
-      }}
-    >
+    <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen
         name="Home"
         component={AdminHomeScreen}
@@ -48,26 +39,9 @@ export default function AdminNavigator() {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{ tabBarIcon: ({ focused }) => icon('👤', focused) }}
       />
     </Tab.Navigator>
   )
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    height: Platform.OS === 'ios' ? 84 : 64,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    paddingTop: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 -2px 12px rgba(15,23,42,0.06)' } as any,
-      default: { shadowColor: '#0f172a', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 8 },
-    }),
-  },
-  label: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  tabItem: { paddingTop: 4 },
-})

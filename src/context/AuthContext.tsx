@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { AuthContextState, AuthPayload, SignUpParams, User } from '../types'
-import { clearAuthData, loadAuthData, saveAuthData, signInRequest, signUpRequest } from '../api/client'
+import { clearAuthData, fetchCurrentUser, loadAuthData, saveAuthData, signInRequest, signUpRequest } from '../api/client'
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined)
 
@@ -16,6 +16,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (saved) {
           setUser(saved.user)
           setToken(saved.token)
+          try {
+            const fresh = await fetchCurrentUser(saved.token)
+            if (fresh.success && fresh.data) {
+              setUser(fresh.data)
+              saveAuthData({ token: saved.token, user: fresh.data }).catch(() => {})
+            }
+          } catch {
+            // Keep cached user if refresh fails (offline / expired token handled on next API call)
+          }
         }
       } catch (error) {
         console.warn('Auth restore failed', error)

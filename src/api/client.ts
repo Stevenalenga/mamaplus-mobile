@@ -336,10 +336,68 @@ export async function fetchEnrollments(token: string) {
   )
 }
 
-export async function fetchEnrollment(token: string, courseId: string) {
+export async function createEnrollment(token: string, courseId: string) {
+  return request<{ success: boolean; data: any; message?: string }>(
+    '/api/enrollments',
+    {
+      method: 'POST',
+      body: JSON.stringify({ courseId }),
+    },
+    token
+  )
+}
+
+// ─── Progress ────────────────────────────────────────────────────────────────
+
+export async function fetchProgress(token: string, courseId?: string) {
+  const qs = courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''
   return request<{ success: boolean; data: any }>(
-    `/api/enrollments/${courseId}`,
+    `/api/progress${qs}`,
     { method: 'GET' },
+    token
+  )
+}
+
+export async function updateLessonProgress(
+  token: string,
+  lessonId: string,
+  isCompleted: boolean
+) {
+  return request<{ success: boolean; data: any }>(
+    '/api/progress',
+    {
+      method: 'POST',
+      body: JSON.stringify({ lessonId, isCompleted }),
+    },
+    token
+  )
+}
+
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+export async function fetchCurrentUser(token: string) {
+  return request<{ success: boolean; data: any }>(
+    '/api/users/me',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function updateProfile(
+  token: string,
+  payload: {
+    name?: string
+    email?: string
+    currentPassword?: string
+    newPassword?: string
+  }
+) {
+  return request<{ success: boolean; data: any; message?: string }>(
+    '/api/users/me',
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
     token
   )
 }
@@ -375,18 +433,77 @@ export async function recruitCaregiver(token: string, caregiverId: string) {
 
 export async function searchCaregivers(token: string, query: string) {
   return request<{ success: boolean; data: any[] }>(
-    `/api/agencies/search?q=${encodeURIComponent(query)}`,
+    `/api/agencies/caregivers/search?query=${encodeURIComponent(query)}`,
     { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchRecruitedCaregivers(token: string) {
+  return request<{ success: boolean; data: any[] }>(
+    '/api/agencies/caregivers?recruited=true',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function rateCaregiver(
+  token: string,
+  recruitmentId: string,
+  rating: number,
+  reviewComment?: string
+) {
+  return request<{ success: boolean; data: any }>(
+    `/api/agencies/caregivers/${recruitmentId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ rating, reviewComment }),
+    },
+    token
+  )
+}
+
+export async function sponsorCaregiver(
+  token: string,
+  caregiverId: string,
+  courseId: string
+) {
+  return request<{ success: boolean; data: any; message?: string }>(
+    '/api/agencies/sponsorships',
+    {
+      method: 'POST',
+      body: JSON.stringify({ caregiverId, courseId }),
+    },
     token
   )
 }
 
 // ─── Admin ───────────────────────────────────────────────────────────────────
 
-export async function fetchAdminUsers(token: string) {
-  return request<{ success: boolean; data: any[] }>(
-    '/api/admin/users',
+export async function fetchAdminUsers(
+  token: string,
+  params?: { search?: string; role?: string; page?: number; limit?: number }
+) {
+  const qs = new URLSearchParams()
+  if (params?.search) qs.set('search', params.search)
+  if (params?.role) qs.set('role', params.role)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  return request<{ success: boolean; data: { users: any[]; total: number; page: number; limit: number; totalPages: number } }>(
+    `/api/admin/users${query ? `?${query}` : ''}`,
     { method: 'GET' },
+    token
+  )
+}
+
+export async function updateAdminUserRole(token: string, userId: string, role: string) {
+  return request<{ success: boolean; data: any; message?: string }>(
+    '/api/admin/users',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ userId, role }),
+    },
     token
   )
 }
