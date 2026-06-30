@@ -1,35 +1,55 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext'
-import { fetchCourses, publishCourse, unpublishCourse, deleteCourse } from '../../api/client'
+import { fetchCourses } from '../../api/client'
 
 type Course = {
   id: string
   title: string
   description?: string
-  status: 'DRAFT' | 'PUBLISHED'
-  sectionCount: number
   enrolledStudents: number
-  updatedAt: string
 }
+
+type School = {
+  id: string
+  name: string
+  location: string
+  studentCount: number
+}
+
+let nextSchoolId = 100
+
+function uid() {
+  return Math.random().toString(36).slice(2, 9)
+}
+
+const DEFAULT_SCHOOLS: School[] = [
+  { id: uid(), name: 'Nairobi Central Campus', location: 'Nairobi', studentCount: 125 },
+  { id: uid(), name: 'Mombasa Learning Center', location: 'Mombasa', studentCount: 87 },
+]
 
 export default function AdminAssistantHomeScreen() {
   const { user, token } = useAuth()
 
   const [courses, setCourses] = useState<Course[]>([])
+  const [schools, setSchools] = useState<School[]>(DEFAULT_SCHOOLS)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
+  const [schoolName, setSchoolName] = useState('')
+  const [schoolLocation, setSchoolLocation] = useState('')
+  const [schoolStudentCount, setSchoolStudentCount] = useState('')
 
   const loadCourses = useCallback(async () => {
     if (!token) return
@@ -41,11 +61,8 @@ export default function AdminAssistantHomeScreen() {
             id: c.id,
             title: c.title,
             description: c.description,
-            status: c.isPublished ? 'PUBLISHED' : 'DRAFT',
-            sectionCount: (c.modules || []).length,
             enrolledStudents: c._count?.enrollments || 0,
-            updatedAt: c.updatedAt,
-          }))
+          })),
         )
       }
     } catch (err) {
@@ -58,48 +75,28 @@ export default function AdminAssistantHomeScreen() {
 
   useEffect(() => { loadCourses() }, [loadCourses])
 
-  async function handleToggle(course: Course) {
-    if (!token) return
-    const action = course.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'
-    Alert.alert(`${action} course?`, `"${course.title}"`, [
-      { text: 'Cancel', style: 'cancel' },
+  function addSchool() {
+    if (!schoolName.trim() || !schoolLocation.trim()) return
+    setSchools((prev) => [
       {
-        text: action,
-        onPress: async () => {
-          try {
-            course.status === 'PUBLISHED'
-              ? await unpublishCourse(token, course.id)
-              : await publishCourse(token, course.id)
-            loadCourses()
-          } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Failed.')
-          }
-        },
+        id: String(nextSchoolId++),
+        name: schoolName.trim(),
+        location: schoolLocation.trim(),
+        studentCount: parseInt(schoolStudentCount, 10) || 0,
       },
+      ...prev,
     ])
+    setSchoolName('')
+    setSchoolLocation('')
+    setSchoolStudentCount('')
   }
 
-  async function handleDelete(course: Course) {
-    if (!token) return
-    Alert.alert('Delete Course', `Delete "${course.title}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteCourse(token, course.id)
-            loadCourses()
-          } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete.')
-          }
-        },
-      },
-    ])
+  function removeSchool(id: string) {
+    setSchools((prev) => prev.filter((s) => s.id !== id))
   }
 
-  const totalEnrollments = courses.reduce((s, c) => s + c.enrolledStudents, 0)
-  const publishedCount = courses.filter((c) => c.status === 'PUBLISHED').length
+  const totalStudents = schools.reduce((sum, s) => sum + s.studentCount, 0)
+  const totalEnrollments = courses.reduce((sum, c) => sum + c.enrolledStudents, 0)
 
   if (loading) {
     return (
@@ -117,18 +114,27 @@ export default function AdminAssistantHomeScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCourses() }} tintColor="#2563eb" />}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadCourses() }}
+            tintColor="#2563eb"
+          />
+        }
       >
         <Text style={styles.greeting}>Welcome back,</Text>
         <Text style={styles.name}>{user?.name ?? 'Admin Assistant'}</Text>
-        <Text style={styles.subtitle}>Support administrators and manage courses.</Text>
+        <Text style={styles.subtitle}>
+          View courses and manage schools. Course catalog updates are reserved for administrators.
+        </Text>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
+        <View style={styles.statsGrid}>
           {[
             { label: 'Total Courses', value: courses.length, color: '#2563eb', bg: '#eff6ff' },
-            { label: 'Published', value: publishedCount, color: '#16a34a', bg: '#f0fdf4' },
-            { label: 'Total Enrolled', value: totalEnrollments, color: '#7c3aed', bg: '#f5f3ff' },
+            { label: 'Physical Schools', value: schools.length, color: '#7c3aed', bg: '#f5f3ff' },
+            { label: 'Total Students', value: totalStudents, color: '#2563eb', bg: '#eff6ff' },
+            { label: 'Enrollments', value: totalEnrollments, color: '#16a34a', bg: '#f0fdf4' },
           ].map((s) => (
             <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
               <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
@@ -137,51 +143,72 @@ export default function AdminAssistantHomeScreen() {
           ))}
         </View>
 
-        {/* Course list */}
-        <Text style={styles.sectionTitle}>All Courses ({courses.length})</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Physical Schools</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="School name"
+            placeholderTextColor="#94a3b8"
+            value={schoolName}
+            onChangeText={setSchoolName}
+          />
+          <View style={styles.formRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="Location"
+              placeholderTextColor="#94a3b8"
+              value={schoolLocation}
+              onChangeText={setSchoolLocation}
+            />
+            <TextInput
+              style={[styles.input, { width: 100 }]}
+              placeholder="Students"
+              placeholderTextColor="#94a3b8"
+              value={schoolStudentCount}
+              onChangeText={setSchoolStudentCount}
+              keyboardType="numeric"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.addBtn, (!schoolName.trim() || !schoolLocation.trim()) && styles.btnDisabled]}
+            onPress={addSchool}
+            disabled={!schoolName.trim() || !schoolLocation.trim()}
+          >
+            <Text style={styles.addBtnText}>Add School</Text>
+          </TouchableOpacity>
 
+          {schools.length === 0 ? (
+            <Text style={styles.emptyInline}>No schools yet.</Text>
+          ) : (
+            schools.map((school) => (
+              <View key={school.id} style={styles.schoolRow}>
+                <View style={styles.schoolInfo}>
+                  <Text style={styles.schoolName}>{school.name}</Text>
+                  <Text style={styles.schoolMeta}>
+                    {school.location} · {school.studentCount} students
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => removeSchool(school.id)}>
+                  <Text style={styles.removeText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>Published Courses</Text>
         {courses.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyText}>No courses on the platform yet.</Text>
+            <Text style={styles.emptyText}>No published courses yet.</Text>
           </View>
         ) : (
           courses.map((course) => (
             <View key={course.id} style={styles.courseCard}>
-              <View style={styles.courseInfo}>
-                <Text style={styles.courseTitle}>{course.title}</Text>
-                {course.description ? (
-                  <Text style={styles.courseDesc} numberOfLines={2}>{course.description}</Text>
-                ) : null}
-                <View style={styles.courseMeta}>
-                  <View style={[styles.badge, { backgroundColor: course.status === 'PUBLISHED' ? '#dcfce7' : '#f1f5f9' }]}>
-                    <Text style={[styles.badgeText, { color: course.status === 'PUBLISHED' ? '#16a34a' : '#64748b' }]}>
-                      {course.status}
-                    </Text>
-                  </View>
-                  <Text style={styles.metaText}>{course.sectionCount} sections</Text>
-                  <Text style={styles.metaText}>{course.enrolledStudents} enrolled</Text>
-                </View>
-              </View>
-
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: course.status === 'PUBLISHED' ? '#fffbeb' : '#f0fdf4' }]}
-                  onPress={() => handleToggle(course)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.actionBtnText, { color: course.status === 'PUBLISHED' ? '#d97706' : '#16a34a' }]}>
-                    {course.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#fff1f2' }]}
-                  onPress={() => handleDelete(course)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.courseTitle}>{course.title}</Text>
+              {course.description ? (
+                <Text style={styles.courseDesc} numberOfLines={2}>{course.description}</Text>
+              ) : null}
+              <Text style={styles.courseMeta}>{course.enrolledStudents} enrolled</Text>
             </View>
           ))
         )}
@@ -203,35 +230,45 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 16, color: '#64748b', marginBottom: 2 },
   name: { fontSize: 26, fontWeight: '800', color: '#0f172a', marginBottom: 6 },
   subtitle: { fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 20 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, borderRadius: 14, padding: 14, ...shadow },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  statCard: { width: '47%', borderRadius: 14, padding: 14, ...shadow },
   statValue: { fontSize: 22, fontWeight: '800', marginBottom: 2 },
   statLabel: { fontSize: 11, color: '#64748b', fontWeight: '500' },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 40,
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, ...shadow },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  input: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  formRow: { flexDirection: 'row', gap: 8 },
+  addBtn: { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 16 },
+  addBtnText: { color: '#fff', fontWeight: '700' },
+  btnDisabled: { opacity: 0.5 },
+  emptyInline: { color: '#94a3b8', fontSize: 14 },
+  schoolRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    ...shadow,
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingVertical: 12,
   },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyText: { fontSize: 15, color: '#94a3b8' },
-  courseCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    ...shadow,
-  },
-  courseInfo: { marginBottom: 12 },
+  schoolInfo: { flex: 1 },
+  schoolName: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
+  schoolMeta: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  removeText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  emptyCard: { backgroundColor: '#fff', borderRadius: 16, padding: 32, alignItems: 'center', ...shadow },
+  emptyText: { color: '#94a3b8', fontSize: 14 },
+  courseCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, ...shadow },
   courseTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
-  courseDesc: { fontSize: 13, color: '#64748b', marginBottom: 8, lineHeight: 19 },
-  courseMeta: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  metaText: { fontSize: 12, color: '#94a3b8' },
-  actions: { flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 },
-  actionBtn: { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
-  actionBtnText: { fontSize: 13, fontWeight: '700' },
+  courseDesc: { fontSize: 13, color: '#64748b', marginBottom: 4 },
+  courseMeta: { fontSize: 12, color: '#94a3b8' },
 })

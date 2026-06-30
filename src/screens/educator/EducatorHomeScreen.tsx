@@ -1,65 +1,92 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useNavigation } from '@react-navigation/native'
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
 import { useAuth } from '../../context/AuthContext'
-import {
-  fetchCourses,
-  createCourse,
-  deleteCourse,
-  publishCourse,
-  unpublishCourse,
-} from '../../api/client'
+import { fetchCourses } from '../../api/client'
+import { decodeLessonResourceMeta, decodeModuleDescription, mapLessonType } from '../../lib/course-authoring'
+import { EducatorTabParamList } from '../../types'
 
-type CourseStatus = 'DRAFT' | 'PUBLISHED'
+type NavProp = BottomTabNavigationProp<EducatorTabParamList, 'Home'>
+
+type LessonItem = {
+  id: string
+  title: string
+  type: string
+  isMilestone: boolean
+}
+
+type CourseSection = {
+  id: string
+  title: string
+  isMilestone: boolean
+  lessons: LessonItem[]
+}
 
 type ManagedCourse = {
   id: string
   title: string
   description?: string
-  status: CourseStatus
-  sectionCount: number
+  sections: CourseSection[]
   enrolledStudents: number
-  updatedAt: string
+}
+
+function mapApiCourse(course: any): ManagedCourse {
+  return {
+    id: course.id,
+    title: course.title,
+    description: course.description || '',
+    sections: (course.modules || []).map((module: any) => {
+      const moduleMeta = decodeModuleDescription(module.description)
+      return {
+        id: module.id,
+        title: module.title,
+        isMilestone: moduleMeta.isMilestone,
+        lessons: (module.lessons || []).map((lesson: any) => {
+          const lessonMeta = decodeLessonResourceMeta(lesson.resourceUrls)
+          return {
+            id: lesson.id,
+            title: lesson.title,
+            type: mapLessonType(lesson.content),
+            isMilestone: lessonMeta.isMilestone,
+          }
+        }),
+      }
+    }),
+    enrolledStudents: course._count?.enrollments || 0,
+  }
 }
 
 export default function EducatorHomeScreen() {
   const { user, token } = useAuth()
+  const navigation = useNavigation<NavProp>()
 
   const [courses, setCourses] = useState<ManagedCourse[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-
-  const [draftTitle, setDraftTitle] = useState('')
-  const [draftDesc, setDraftDesc] = useState('')
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
 
   const loadCourses = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetchCourses(token, true)
+      const res = await fetchCourses(token)
       if (res.success) {
-        const mapped: ManagedCourse[] = res.data.map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          description: c.description,
-          status: c.isPublished ? 'PUBLISHED' : 'DRAFT',
-          sectionCount: (c.modules || []).length,
-          enrolledStudents: c._count?.enrollments || 0,
-          updatedAt: c.updatedAt,
-        }))
+        const mapped = res.data.map(mapApiCourse)
         setCourses(mapped)
+        if (mapped.length > 0 && !mapped.some((c) => c.id === selectedCourseId)) {
+          setSelectedCourseId(mapped[0].id)
+        }
+        if (mapped.length === 0) setSelectedCourseId(null)
       }
     } catch (err) {
       console.warn('Educator loadCourses failed', err)
@@ -67,82 +94,16 @@ export default function EducatorHomeScreen() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [token])
+  }, [token, selectedCourseId])
 
-  useEffect(() => {
-    loadCourses()
-  }, [loadCourses])
+  useEffect(() => { loadCourses() }, [loadCourses])
 
-  async function handleCreate() {
-    if (!token || !draftTitle.trim() || !draftDesc.trim()) return
-    setSubmitting(true)
-    try {
-      const res = await createCourse(token, {
-        title: draftTitle.trim(),
-        description: draftDesc.trim(),
-      })
-      if (res.success) {
-        setDraftTitle('')
-        setDraftDesc('')
-        setShowCreateForm(false)
-        loadCourses()
-        Alert.alert('Draft created', 'Your course draft has been created. Go to the portal to add sections and lessons.')
-      }
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create course.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const selectedCourse = useMemo(
+    () => courses.find((c) => c.id === selectedCourseId) || null,
+    [courses, selectedCourseId],
+  )
 
-  async function handleDelete(course: ManagedCourse) {
-    Alert.alert('Delete Course', `Delete "${course.title}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          if (!token) return
-          try {
-            await deleteCourse(token, course.id)
-            loadCourses()
-          } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete.')
-          }
-        },
-      },
-    ])
-  }
-
-  async function handleTogglePublish(course: ManagedCourse) {
-    if (!token) return
-    const action = course.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'
-    Alert.alert(
-      `${action} Course`,
-      `${action} "${course.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: action,
-          onPress: async () => {
-            try {
-              if (course.status === 'PUBLISHED') {
-                await unpublishCourse(token, course.id)
-              } else {
-                await publishCourse(token, course.id)
-              }
-              loadCourses()
-            } catch (err) {
-              Alert.alert('Error', err instanceof Error ? err.message : `Failed to ${action.toLowerCase()}.`)
-            }
-          },
-        },
-      ]
-    )
-  }
-
-  const totalStudents = courses.reduce((s, c) => s + c.enrolledStudents, 0)
-  const publishedCount = courses.filter((c) => c.status === 'PUBLISHED').length
+  const totalStudents = courses.reduce((sum, c) => sum + c.enrolledStudents, 0)
 
   if (loading) {
     return (
@@ -160,19 +121,24 @@ export default function EducatorHomeScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCourses() }} tintColor="#2563eb" />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadCourses() }}
+            tintColor="#2563eb"
+          />
+        }
       >
         <Text style={styles.greeting}>Welcome back,</Text>
         <Text style={styles.name}>{user?.name ?? 'Educator'}</Text>
-        <Text style={styles.subtitle}>Create courses, add milestones, save drafts, then publish when ready.</Text>
+        <Text style={styles.subtitle}>
+          Browse published courses. The course catalog is managed by administrators.
+        </Text>
 
-        {/* Stats */}
         <View style={styles.statsRow}>
           {[
-            { label: 'My Courses', value: courses.length, color: '#2563eb', bg: '#eff6ff' },
-            { label: 'Published', value: publishedCount, color: '#16a34a', bg: '#f0fdf4' },
-            { label: 'Students', value: totalStudents, color: '#7c3aed', bg: '#f5f3ff' },
+            { label: 'Published Courses', value: courses.length, color: '#2563eb', bg: '#eff6ff' },
+            { label: 'Total Enrolled', value: totalStudents, color: '#2563eb', bg: '#eff6ff' },
           ].map((s) => (
             <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
               <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
@@ -181,123 +147,74 @@ export default function EducatorHomeScreen() {
           ))}
         </View>
 
-        {/* Create new draft */}
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.createHeader}
-            onPress={() => setShowCreateForm((v) => !v)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.cardTitle}>Create New Draft Course</Text>
-            <Text style={styles.toggleIcon}>{showCreateForm ? '▾' : '▸'}</Text>
-          </TouchableOpacity>
-
-          {showCreateForm && (
-            <View style={styles.createForm}>
-              <TextInput
-                style={styles.input}
-                placeholder="Course title"
-                placeholderTextColor="#94a3b8"
-                value={draftTitle}
-                onChangeText={setDraftTitle}
-                editable={!submitting}
-              />
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Course description"
-                placeholderTextColor="#94a3b8"
-                value={draftDesc}
-                onChangeText={setDraftDesc}
-                multiline
-                numberOfLines={3}
-                editable={!submitting}
-              />
-              <TouchableOpacity
-                style={[styles.createBtn, (!draftTitle.trim() || !draftDesc.trim() || submitting) && styles.btnDisabled]}
-                onPress={handleCreate}
-                disabled={!draftTitle.trim() || !draftDesc.trim() || submitting}
-                activeOpacity={0.85}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text style={styles.createBtnText}>Create Draft</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* My courses list */}
-        <Text style={styles.sectionTitle}>My Courses ({courses.length})</Text>
-
+        <Text style={styles.sectionTitle}>Published Courses</Text>
         {courses.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>📝</Text>
-            <Text style={styles.emptyTitle}>No courses yet</Text>
-            <Text style={styles.emptyDesc}>Create your first draft course above.</Text>
+            <Text style={styles.emptyText}>No published courses yet.</Text>
           </View>
         ) : (
           courses.map((course) => (
-            <View key={course.id} style={styles.courseCard}>
-              <View style={styles.courseTop}>
-                <View style={styles.courseInfo}>
-                  <Text style={styles.courseTitle}>{course.title}</Text>
-                  {course.description ? (
-                    <Text style={styles.courseDesc} numberOfLines={2}>{course.description}</Text>
-                  ) : null}
-                  <View style={styles.courseMeta}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: course.status === 'PUBLISHED' ? '#dcfce7' : '#f1f5f9' },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          { color: course.status === 'PUBLISHED' ? '#16a34a' : '#64748b' },
-                        ]}
-                      >
-                        {course.status}
-                      </Text>
-                    </View>
-                    <Text style={styles.metaText}>{course.sectionCount} sections</Text>
-                    <Text style={styles.metaText}>{course.enrolledStudents} students</Text>
-                  </View>
+            <TouchableOpacity
+              key={course.id}
+              style={[styles.courseCard, selectedCourseId === course.id && styles.courseCardSelected]}
+              onPress={() => setSelectedCourseId(course.id)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.courseTitle}>{course.title}</Text>
+              {course.description ? (
+                <Text style={styles.courseDesc} numberOfLines={2}>{course.description}</Text>
+              ) : null}
+              <View style={styles.courseMeta}>
+                <View style={styles.publishedBadge}>
+                  <Text style={styles.publishedBadgeText}>PUBLISHED</Text>
                 </View>
+                <Text style={styles.metaText}>{course.sections.length} sections</Text>
+                <Text style={styles.metaText}>{course.enrolledStudents} enrolled</Text>
               </View>
-
-              <View style={styles.courseActions}>
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    { backgroundColor: course.status === 'PUBLISHED' ? '#fffbeb' : '#f0fdf4' },
-                  ]}
-                  onPress={() => handleTogglePublish(course)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.actionBtnText,
-                      { color: course.status === 'PUBLISHED' ? '#d97706' : '#16a34a' },
-                    ]}
-                  >
-                    {course.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#fff1f2' }]}
-                  onPress={() => handleDelete(course)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
+
+        {selectedCourse ? (
+          <View style={styles.contentCard}>
+            <Text style={styles.cardTitle}>Course Content</Text>
+            <Text style={styles.selectedTitle}>{selectedCourse.title}</Text>
+            {selectedCourse.description ? (
+              <Text style={styles.selectedDesc}>{selectedCourse.description}</Text>
+            ) : null}
+
+            {selectedCourse.sections.length === 0 ? (
+              <Text style={styles.emptyInline}>No sections in this course yet.</Text>
+            ) : (
+              selectedCourse.sections.map((section) => (
+                <View key={section.id} style={styles.sectionCard}>
+                  <Text style={styles.sectionName}>{section.title}</Text>
+                  <Text style={styles.sectionSub}>
+                    {section.isMilestone ? 'Section milestone' : 'Regular section'}
+                  </Text>
+                  {section.lessons.length === 0 ? (
+                    <Text style={styles.emptyInline}>No lessons in this section.</Text>
+                  ) : (
+                    section.lessons.map((lesson) => (
+                      <View key={lesson.id} style={styles.lessonRow}>
+                        <Text style={styles.lessonTitle}>{lesson.title}</Text>
+                        <Text style={styles.lessonType}>
+                          {lesson.type.toUpperCase()}{lesson.isMilestone ? ' · Milestone' : ''}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Courses')}>
+            <Text style={styles.primaryBtnText}>Browse Courses</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -320,72 +237,29 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, borderRadius: 14, padding: 14, ...shadow },
   statValue: { fontSize: 22, fontWeight: '800', marginBottom: 2 },
   statLabel: { fontSize: 11, color: '#64748b', fontWeight: '500' },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    ...shadow,
-  },
-  createHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-  toggleIcon: { fontSize: 16, color: '#94a3b8' },
-  createForm: { marginTop: 14, gap: 10 },
-  input: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#0f172a',
-  },
-  textArea: { height: 80, textAlignVertical: 'top', paddingTop: 10 },
-  createBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  createBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
-  btnDisabled: { opacity: 0.5 },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 40,
-    alignItems: 'center',
-    ...shadow,
-  },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 6 },
-  emptyDesc: { fontSize: 13, color: '#94a3b8', textAlign: 'center' },
-  courseCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    ...shadow,
-  },
-  courseTop: { marginBottom: 12 },
-  courseInfo: {},
-  courseTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
-  courseDesc: { fontSize: 13, color: '#64748b', marginBottom: 8, lineHeight: 19 },
-  courseMeta: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  statusBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  statusText: { fontSize: 11, fontWeight: '700' },
+  emptyCard: { backgroundColor: '#fff', borderRadius: 16, padding: 32, alignItems: 'center', marginBottom: 16, ...shadow },
+  emptyText: { color: '#94a3b8', fontSize: 14 },
+  courseCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, ...shadow },
+  courseCardSelected: { borderWidth: 2, borderColor: '#2563eb' },
+  courseTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  courseDesc: { fontSize: 13, color: '#64748b', marginBottom: 8 },
+  courseMeta: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  publishedBadge: { backgroundColor: '#dcfce7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  publishedBadgeText: { color: '#16a34a', fontSize: 11, fontWeight: '700' },
   metaText: { fontSize: 12, color: '#94a3b8' },
-  courseActions: { flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 },
-  actionBtn: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  actionBtnText: { fontSize: 13, fontWeight: '700' },
+  contentCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 6, marginBottom: 16, ...shadow },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  selectedTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  selectedDesc: { fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 20 },
+  sectionCard: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 12, marginBottom: 10 },
+  sectionName: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  sectionSub: { fontSize: 11, color: '#94a3b8', marginBottom: 8 },
+  lessonRow: { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingVertical: 8 },
+  lessonTitle: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
+  lessonType: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  emptyInline: { fontSize: 13, color: '#94a3b8' },
+  quickActions: { marginTop: 4 },
+  primaryBtn: { backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 })

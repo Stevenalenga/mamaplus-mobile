@@ -37,7 +37,7 @@ export default function AdminHomeScreen() {
     try {
       const [usersRes, coursesRes] = await Promise.allSettled([
         fetchAdminUsers(token),
-        fetchCourses(token),
+        fetchCourses(token, true),
       ])
 
       if (usersRes.status === 'fulfilled' && usersRes.value.success) {

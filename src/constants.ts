@@ -109,7 +109,7 @@ export const ROLE_DASHBOARD_LABELS: Record<string, string> = {
   PENDING: 'Complete onboarding to unlock the portal.',
   USER: 'Browse courses, enroll, and track progress.',
   AGENCY: 'Manage caregivers and agency details.',
-  INSTRUCTOR: 'Manage your courses and learners.',
-  ADMIN_ASSISTANT: 'Support administrators and manage requests.',
+  INSTRUCTOR: 'Browse published courses and track learner progress.',
+  ADMIN_ASSISTANT: 'View courses and manage schools.',
   ADMIN: 'Access full admin controls.'
 }

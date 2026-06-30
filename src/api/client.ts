@@ -205,23 +205,33 @@ export async function createCourse(token: string, payload: {
   category?: string
   level?: string
   duration?: number
+  durationLabel?: string
+  scheduleDates?: string
+  location?: string
   priceUSD?: number
   priceKES?: number
   currency?: string
   isPublished?: boolean
+  isFeatured?: boolean
+  requirements?: string
+  whatYouLearn?: string
+  keyBenefits?: string
+  specialOffer?: string
+  shortDescription?: string
 }) {
   return request<{ success: boolean; data: any }>(
     '/api/courses',
     {
       method: 'POST',
       body: JSON.stringify({
-        category: 'Educator Created',
+        category: 'Professional Training',
         level: 'BEGINNER',
         duration: 0,
         priceUSD: 0,
         priceKES: 0,
-        currency: 'USD',
+        currency: 'KES',
         isPublished: false,
+        isFeatured: false,
         ...payload,
       }),
     },
@@ -232,7 +242,22 @@ export async function createCourse(token: string, payload: {
 export async function updateCourse(token: string, courseId: string, payload: {
   title?: string
   description?: string
+  shortDescription?: string
+  durationLabel?: string
+  scheduleDates?: string
+  location?: string
+  priceUSD?: number
+  priceKES?: number
+  currency?: string
   isPublished?: boolean
+  isFeatured?: boolean
+  requirements?: string
+  whatYouLearn?: string
+  keyBenefits?: string
+  specialOffer?: string
+  category?: string
+  level?: string
+  duration?: number
 }) {
   return request<{ success: boolean; data: any }>(
     `/api/courses/${courseId}`,
@@ -313,6 +338,23 @@ export async function addLesson(
     {
       method: 'POST',
       body: JSON.stringify({ duration: 0, ...payload }),
+    },
+    token
+  )
+}
+
+export async function updateLesson(
+  token: string,
+  courseId: string,
+  moduleId: string,
+  lessonId: string,
+  payload: { title?: string; type?: string; url?: string; isMilestone?: boolean; duration?: number }
+) {
+  return request<{ success: boolean; data: any }>(
+    `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
     },
     token
   )

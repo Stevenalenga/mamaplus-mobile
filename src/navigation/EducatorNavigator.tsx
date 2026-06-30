@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Text, View } from 'react-native'
 import EducatorHomeScreen from '../screens/educator/EducatorHomeScreen'
+import CoursesScreen from '../screens/CoursesScreen'
 import ProfileStackNavigator from './ProfileStackNavigator'
 import { EducatorTabParamList } from '../types'
 import { useTabBarScreenOptions } from './useTabBarScreenOptions'
@@ -15,6 +16,10 @@ function icon(emoji: string, focused: boolean) {
   )
 }
 
+function BrowseCoursesScreen() {
+  return <CoursesScreen canEnroll={false} />
+}
+
 export default function EducatorNavigator() {
   const screenOptions = useTabBarScreenOptions()
 
@@ -24,6 +29,11 @@ export default function EducatorNavigator() {
         name="Home"
         component={EducatorHomeScreen}
         options={{ tabBarLabel: 'Dashboard', tabBarIcon: ({ focused }) => icon('📊', focused) }}
+      />
+      <Tab.Screen
+        name="Courses"
+        component={BrowseCoursesScreen}
+        options={{ tabBarLabel: 'Browse', tabBarIcon: ({ focused }) => icon('📚', focused) }}
       />
       <Tab.Screen
         name="Profile"

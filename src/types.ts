@@ -86,6 +86,7 @@ export type AgencyTabParamList = {
 
 export type EducatorTabParamList = {
   Home: undefined
+  Courses: undefined
   Profile: undefined
 }
 
