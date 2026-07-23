@@ -49,7 +49,9 @@ export default {
       eas: {
         projectId: 'c6718901-59ba-4ec4-8da9-42d1fd8e53a1'
       },
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000',
+      // Falls back to production so installed builds always reach a real server.
+      // For local development set EXPO_PUBLIC_API_URL=http://localhost:3000 in .env
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://mamaplus.co.ke',
       expoGoogleClientId:
         process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
         process.env.EXPO_GOOGLE_CLIENT_ID ||

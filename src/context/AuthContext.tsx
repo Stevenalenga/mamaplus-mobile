@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { AuthContextState, AuthPayload, SignUpParams, User } from '../types'
+import { AuthContextState, SignUpParams, User } from '../types'
 import { clearAuthData, fetchCurrentUser, loadAuthData, saveAuthData, signInRequest, signUpRequest } from '../api/client'
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined)
@@ -56,32 +56,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const signInWithSocial = async (auth: AuthPayload) => {
-    setUser(auth.user)
-    setToken(auth.token)
-    saveAuthData(auth).catch((error) => {
-      console.warn('Failed to persist auth after social sign-in', error)
-    })
-  }
-
   const signOut = async () => {
     await clearAuthData()
     setUser(null)
     setToken(null)
   }
 
-  /** Updates the in-memory user and persists it (e.g. after onboarding). */
-  const updateUser = (updatedUser: User) => {
+  /** Updates the in-memory user (and optional refreshed token after onboarding). */
+  const updateUser = (updatedUser: User, nextToken?: string) => {
+    const authToken = nextToken ?? token
     setUser(updatedUser)
-    if (token) {
-      saveAuthData({ token, user: updatedUser }).catch((error) => {
+    if (nextToken) {
+      setToken(nextToken)
+    }
+    if (authToken) {
+      saveAuthData({ token: authToken, user: updatedUser }).catch((error) => {
         console.warn('Failed to persist updated user', error)
       })
     }
   }
 
   const value = useMemo(
-    () => ({ user, token, isLoading, signIn, signUp, signInWithSocial, signOut, updateUser }),
+    () => ({ user, token, isLoading, signIn, signUp, signOut, updateUser }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, token, isLoading]
   )

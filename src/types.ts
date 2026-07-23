@@ -35,9 +35,9 @@ export interface AuthContextState {
   isLoading: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (payload: SignUpParams) => Promise<void>
-  signInWithSocial: (auth: AuthPayload) => Promise<void>
   signOut: () => Promise<void>
-  updateUser: (user: User) => void
+  /** Persist updated user (and optional refreshed token after onboarding). */
+  updateUser: (user: User, nextToken?: string) => void
 }
 
 // ─── Root stack (auth + onboarding gate) ────────────────────────────────────

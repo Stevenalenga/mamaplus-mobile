@@ -69,13 +69,19 @@ export default function OnboardingScreen() {
       )
 
       if (result.success && result.data) {
-        // Merge the updated fields into the current user object
+        const payload = result.data
+        const serverUser = payload.user
         const updatedUser = {
           ...user!,
-          role: selectedRole,
-          gender: selectedRole === 'USER' ? selectedGender : undefined,
+          ...(serverUser || {}),
+          role: (serverUser?.role as typeof selectedRole) || selectedRole,
+          gender:
+            selectedRole === 'USER'
+              ? ((serverUser?.gender as SelectedGender | undefined) ?? selectedGender ?? null)
+              : null,
         }
-        updateUser(updatedUser)
+        // Persist refreshed JWT so subsequent API calls use the new role
+        updateUser(updatedUser, payload.token)
         // AppNavigator will automatically re-render and route to the right tab
       } else {
         Alert.alert('Error', 'Something went wrong. Please try again.')

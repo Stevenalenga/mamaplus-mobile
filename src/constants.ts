@@ -76,26 +76,6 @@ if (__DEV__) {
 
 export const AUTH_STORAGE_KEY = 'mamaplus_auth'
 
-export function getOAuthExtra() {
-  return (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>
-}
-
-export function isGoogleAuthConfigured() {
-  const extra = getOAuthExtra()
-  const clientId = extra.expoGoogleClientId?.trim()
-  const webClientId = extra.expoGoogleWebClientId?.trim()
-
-  if (Platform.OS === 'web') {
-    return Boolean(webClientId)
-  }
-
-  return Boolean(clientId || webClientId)
-}
-
-export function isMicrosoftAuthConfigured() {
-  return Boolean(getOAuthExtra().expoMicrosoftClientId?.trim())
-}
-
 export const ROLE_DISPLAY_NAMES: Record<string, string> = {
   PENDING: 'New User',
   USER: 'Caregiver',

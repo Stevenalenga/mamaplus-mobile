@@ -153,16 +153,6 @@ export async function signUpRequest(payload: SignUpParams) {
   )
 }
 
-export async function socialSignIn(provider: 'google' | 'microsoft', tokens: { idToken?: string; accessToken?: string }) {
-  return request<{ success: boolean; data: AuthPayload }>(
-    '/api/auth/social',
-    {
-      method: 'POST',
-      body: JSON.stringify({ provider, ...tokens })
-    }
-  )
-}
-
 // ─── Onboarding ──────────────────────────────────────────────────────────────
 
 export async function onboardUser(
@@ -170,7 +160,7 @@ export async function onboardUser(
   role: 'USER' | 'AGENCY' | 'INSTRUCTOR',
   gender?: 'MALE' | 'FEMALE'
 ) {
-  return request<{ success: boolean; data: any }>(
+  return request<{ success: boolean; data: { user: any; token: string } }>(
     '/api/users/onboard',
     {
       method: 'POST',
@@ -430,6 +420,7 @@ export async function updateProfile(
   payload: {
     name?: string
     email?: string
+    phoneNumber?: string
     currentPassword?: string
     newPassword?: string
   }

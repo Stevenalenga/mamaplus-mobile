@@ -15,7 +15,6 @@ import { useAuth } from '../context/AuthContext'
 import { getLoginErrorMessage } from '../api/client'
 import { RootStackParamList } from '../types'
 import MamaPlusLogo from '../components/MamaPlusLogo'
-import SocialAuthSection from '../components/SocialAuthSection'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>
 
@@ -74,8 +73,6 @@ export default function LoginScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
             <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
           </TouchableOpacity>
-
-          <SocialAuthSection mode="login" onError={setError} />
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>New here?</Text>
