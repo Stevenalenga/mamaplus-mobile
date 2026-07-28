@@ -1,7 +1,7 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { API_BASE_URL, AUTH_STORAGE_KEY } from '../constants'
-import { AuthPayload, SignUpParams } from '../types'
+import { AuthPayload, BlogPost, SignUpParams } from '../types'
 
 const isWeb = Platform.OS === 'web'
 
@@ -403,6 +403,23 @@ export async function updateLessonProgress(
     },
     token
   )
+}
+
+// ─── Blog ────────────────────────────────────────────────────────────────────
+
+export async function fetchBlogPosts(category?: string) {
+  const qs = category ? `?category=${encodeURIComponent(category)}` : ''
+  return request<{
+    success: boolean
+    data: { posts: BlogPost[]; categories: string[] }
+  }>(`/api/blog${qs}`, { method: 'GET' })
+}
+
+export async function fetchBlogPost(slug: string) {
+  return request<{
+    success: boolean
+    data: { post: BlogPost; relatedPosts: BlogPost[] }
+  }>(`/api/blog/${encodeURIComponent(slug)}`, { method: 'GET' })
 }
 
 // ─── Profile ─────────────────────────────────────────────────────────────────

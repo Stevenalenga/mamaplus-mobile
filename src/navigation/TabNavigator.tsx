@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Platform, StyleSheet, View } from 'react-native'
 import HomeScreen from '../screens/HomeScreen'
 import CoursesScreen from '../screens/CoursesScreen'
+import BlogScreen from '../screens/BlogScreen'
+import BlogDetailScreen from '../screens/BlogDetailScreen'
 import ProfileStackNavigator from './ProfileStackNavigator'
 import CourseDetailScreen from '../screens/CourseDetailScreen'
 import { UserTabParamList, UserStackParamList } from '../types'
@@ -40,6 +42,20 @@ function CoursesIcon({ focused }: { focused: boolean }) {
   )
 }
 
+function BlogIcon({ focused }: { focused: boolean }) {
+  const color = focused ? PRIMARY : INACTIVE
+  return (
+    <View style={icon.wrap}>
+      <View style={[icon.article, { borderColor: color }]}>
+        <View style={[icon.articleLine, { backgroundColor: color, width: '70%' }]} />
+        <View style={[icon.articleLine, { backgroundColor: color, marginTop: 3 }]} />
+        <View style={[icon.articleLine, { backgroundColor: color, marginTop: 3, width: '85%' }]} />
+        <View style={[icon.articleLine, { backgroundColor: color, marginTop: 3, width: '55%' }]} />
+      </View>
+    </View>
+  )
+}
+
 function ProfileIcon({ focused }: { focused: boolean }) {
   const color = focused ? PRIMARY : INACTIVE
   return (
@@ -62,6 +78,16 @@ const icon = StyleSheet.create({
   book: { width: 18, height: 22, borderWidth: 1.5, borderRadius: 2, flexDirection: 'row', padding: 3 },
   bookSpine: { width: 2, height: '100%', marginRight: 3, borderRadius: 1 },
   line: { height: 1.5, width: '100%', borderRadius: 1 },
+  article: {
+    width: 18,
+    height: 20,
+    borderWidth: 1.5,
+    borderRadius: 2,
+    paddingHorizontal: 3,
+    paddingTop: 4,
+    justifyContent: 'flex-start',
+  },
+  articleLine: { height: 1.5, width: '100%', borderRadius: 1 },
   head: { width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, marginBottom: 2 },
   shoulders: { width: 20, height: 8, borderTopLeftRadius: 10, borderTopRightRadius: 10, borderWidth: 1.5, borderBottomWidth: 0 },
 })
@@ -73,12 +99,13 @@ function UserTabs() {
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ focused }) => <HomeIcon focused={focused} /> }} />
       <Tab.Screen name="Courses" component={CoursesScreen} options={{ tabBarIcon: ({ focused }) => <CoursesIcon focused={focused} /> }} />
+      <Tab.Screen name="Blog" component={BlogScreen} options={{ tabBarIcon: ({ focused }) => <BlogIcon focused={focused} /> }} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} options={{ tabBarIcon: ({ focused }) => <ProfileIcon focused={focused} /> }} />
     </Tab.Navigator>
   )
 }
 
-/** USER navigator: tabs + course detail stack */
+/** USER navigator: tabs + course/blog detail stack */
 export default function UserNavigator() {
   return (
     <Stack.Navigator
@@ -95,6 +122,7 @@ export default function UserNavigator() {
     >
       <Stack.Screen name="Tabs" component={UserTabs} />
       <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
+      <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
     </Stack.Navigator>
   )
 }

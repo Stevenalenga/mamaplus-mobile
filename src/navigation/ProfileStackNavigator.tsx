@@ -5,9 +5,15 @@ import EditProfileScreen from '../screens/EditProfileScreen'
 import ChangePasswordScreen from '../screens/ChangePasswordScreen'
 import AgencyCaregiversScreen from '../screens/agency/AgencyCaregiversScreen'
 import ContactScreen from '../screens/ContactScreen'
+import BlogScreen from '../screens/BlogScreen'
+import BlogDetailScreen from '../screens/BlogDetailScreen'
 import { ProfileStackParamList } from '../types'
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>()
+
+function ProfileBlogScreen() {
+  return <BlogScreen embeddedInProfile />
+}
 
 export default function ProfileStackNavigator() {
   const { user } = useAuth()
@@ -19,6 +25,8 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="Contact" component={ContactScreen} />
+      <Stack.Screen name="Blog" component={ProfileBlogScreen} />
+      <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
       {isAgency ? (
         <Stack.Screen name="AgencyCaregivers" component={AgencyCaregiversScreen} />
       ) : null}

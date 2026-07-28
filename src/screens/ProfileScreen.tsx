@@ -42,6 +42,9 @@ export default function ProfileScreen() {
     ...(isAgency
       ? [{ icon: '👥', label: 'My Caregivers', onPress: () => navigation.navigate('AgencyCaregivers') }]
       : []),
+    ...(user?.role !== 'USER'
+      ? [{ icon: '📰', label: 'Blog', onPress: () => navigation.navigate('Blog') }]
+      : []),
     { icon: '🔒', label: 'Change Password', onPress: () => navigation.navigate('ChangePassword') },
     { icon: '❓', label: 'Help & Support', onPress: () => navigation.navigate('Contact') },
   ]

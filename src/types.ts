@@ -58,12 +58,14 @@ export type RootStackParamList = {
 export type UserTabParamList = {
   Home: undefined
   Courses: undefined
+  Blog: undefined
   Profile: undefined
 }
 
 export type UserStackParamList = {
   Tabs: undefined
   CourseDetail: { courseId: string; courseTitle: string }
+  BlogDetail: { slug: string; title?: string }
 }
 
 export type ProfileStackParamList = {
@@ -72,6 +74,24 @@ export type ProfileStackParamList = {
   ChangePassword: undefined
   AgencyCaregivers: undefined
   Contact: undefined
+  Blog: undefined
+  BlogDetail: { slug: string; title?: string }
+}
+
+export interface BlogPost {
+  id?: string
+  slug: string
+  title: string
+  description: string
+  content: string
+  author: string
+  publishedAt: string
+  updatedAt?: string
+  category: string
+  tags: string[]
+  image?: string
+  readTime: string
+  isPublished?: boolean
 }
 
 // ─── AGENCY ─────────────────────────────────────────────────────────────────

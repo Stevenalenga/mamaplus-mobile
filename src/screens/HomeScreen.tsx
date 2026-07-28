@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+﻿import { useCallback, useEffect, useState } from 'react'
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { CompositeNavigationProp } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
-import { ROLE_DISPLAY_NAMES, ROLE_DASHBOARD_LABELS } from '../constants'
+import { ROLE_DISPLAY_NAMES, ROLE_DASHBOARD_LABELS, API_BASE_URL } from '../constants'
 import { fetchCurrentUser, fetchEnrollments } from '../api/client'
 import MamaPlusLogo from '../components/MamaPlusLogo'
 import { UserStackParamList, UserTabParamList } from '../types'
@@ -22,11 +22,25 @@ type EnrolledCourse = {
   progress: number
 }
 
+type MembershipSnapshot = {
+  isActive: boolean
+  membership?: { periodEnd?: string | null } | null
+  entitlement?: {
+    network?: boolean
+    careProtectBase?: boolean
+    careProtectStatus?: string
+    saccoGateway?: boolean
+  } | null
+}
+
+const JOIN_NETWORK_URL = 'https://mamaplus.co.ke/join-network'
+
 export default function HomeScreen() {
   const { user, token } = useAuth()
   const navigation = useNavigation<NavProp>()
   const [stats, setStats] = useState({ enrollments: 0, payments: 0, reviews: 0 })
   const [inProgress, setInProgress] = useState<EnrolledCourse[]>([])
+  const [membership, setMembership] = useState<MembershipSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -42,6 +56,9 @@ export default function HomeScreen() {
           payments: meRes.data._count.payments ?? 0,
           reviews: meRes.data._count.reviews ?? 0,
         })
+      }
+      if (meRes.success && meRes.data.membership) {
+        setMembership(meRes.data.membership)
       }
       if (enrollRes.success) {
         const active = enrollRes.data
@@ -62,6 +79,44 @@ export default function HomeScreen() {
 
   const roleLabel = user ? (ROLE_DISPLAY_NAMES[user.role] ?? user.role) : 'Guest'
   const description = user ? (ROLE_DASHBOARD_LABELS[user.role] ?? '') : ''
+  const isMember = !!membership?.isActive
+
+  const openJoinNetwork = () => {
+    Linking.openURL(JOIN_NETWORK_URL).catch(() => {
+      Linking.openURL(`${API_BASE_URL.replace(/\/$/, '')}/join-network`)
+    })
+  }
+
+  const tiles = [
+    {
+      key: 'network',
+      title: 'Network',
+      status: isMember ? 'Unlocked' : 'Locked',
+      locked: !isMember,
+    },
+    {
+      key: 'careprotect',
+      title: 'CareProtect',
+      status: !isMember
+        ? 'Locked'
+        : membership?.entitlement?.careProtectStatus === 'PENDING_INSURER'
+          ? 'Pending insurer'
+          : 'Unlocked',
+      locked: !isMember,
+    },
+    {
+      key: 'sacco',
+      title: 'SACCO',
+      status: isMember ? 'Gateway open' : 'Locked',
+      locked: !isMember,
+    },
+    {
+      key: 'courses',
+      title: 'Courses',
+      status: 'Open',
+      locked: false,
+    },
+  ]
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -72,12 +127,41 @@ export default function HomeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.greeting}>Welcome back,</Text>
-          <Text style={styles.name}>{user?.name ?? 'User'} 👋</Text>
+          <Text style={styles.name}>{user?.name ?? 'User'}</Text>
           <View style={styles.roleBadge}>
             <Text style={styles.roleBadgeText}>{roleLabel}</Text>
           </View>
           <Text style={styles.description}>{description}</Text>
         </View>
+
+        <Text style={styles.sectionTitle}>Service Access Point</Text>
+        <View style={styles.tilesGrid}>
+          {tiles.map((tile) => (
+            <TouchableOpacity
+              key={tile.key}
+              style={[styles.tile, tile.locked && styles.tileLocked]}
+              onPress={() => {
+                if (tile.key === 'courses') {
+                  navigation.navigate('Courses')
+                } else {
+                  openJoinNetwork()
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.tileTitle}>{tile.title}</Text>
+              <Text style={[styles.tileStatus, !tile.locked && styles.tileStatusOpen]}>
+                {tile.status}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {!isMember && (
+          <TouchableOpacity style={styles.joinBtn} onPress={openJoinNetwork} activeOpacity={0.85}>
+            <Text style={styles.joinBtnText}>Join Network — KES 3,600/yr</Text>
+          </TouchableOpacity>
+        )}
 
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsRow}>
@@ -85,9 +169,9 @@ export default function HomeScreen() {
             <Text style={styles.actionIcon}>📚</Text>
             <Text style={styles.actionLabel}>Browse{'\n'}Courses</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('Courses')} activeOpacity={0.8}>
-            <Text style={styles.actionIcon}>📈</Text>
-            <Text style={styles.actionLabel}>Track{'\n'}Progress</Text>
+          <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('Blog')} activeOpacity={0.8}>
+            <Text style={styles.actionIcon}>📰</Text>
+            <Text style={styles.actionLabel}>Read{'\n'}Blog</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
             <Text style={styles.actionIcon}>👤</Text>
@@ -158,6 +242,27 @@ const styles = StyleSheet.create({
   roleBadgeText: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
   description: { color: '#475569', fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  tilesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  tile: {
+    width: '47%',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  tileLocked: { borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  tileTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  tileStatus: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  tileStatusOpen: { color: '#15803d' },
+  joinBtn: {
+    backgroundColor: '#ea580c',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  joinBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   actionCard: {
     flex: 1,
