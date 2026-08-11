@@ -114,7 +114,7 @@ export type EducatorTabParamList = {
 
 export type AdminAssistantTabParamList = {
   Home: undefined
-  Courses: undefined
+  Blog: undefined
   Profile: undefined
 }
 
@@ -123,8 +123,20 @@ export type AdminAssistantTabParamList = {
 export type AdminTabParamList = {
   Home: undefined
   Courses: undefined
-  Schools: undefined
+  Manage: undefined
   Profile: undefined
+}
+
+export type AdminManageStackParamList = {
+  ManageHome: undefined
+  Users: undefined
+  Enrollments: undefined
+  Payments: undefined
+  Agencies: undefined
+  Reviews: undefined
+  Certificates: undefined
+  Schools: undefined
+  Blog: undefined
 }
 
 // ─── Shared ─────────────────────────────────────────────────────────────────

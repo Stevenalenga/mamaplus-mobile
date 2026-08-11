@@ -1,245 +1,269 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
+  ActivityIndicator,
   Alert,
-  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useAuth } from '../../context/AuthContext'
+import {
+  createAdminSchool,
+  deleteAdminSchool,
+  fetchAdminSchools,
+  updateAdminSchool,
+} from '../../api/client'
+import { AdminManageStackParamList } from '../../types'
+
+type Props = NativeStackScreenProps<AdminManageStackParamList, 'Schools'>
 
 type School = {
   id: string
   name: string
-  location: string
-  educatorCount: number
-  createdAt: string
+  location?: string | null
+  county?: string | null
+  studentCount?: number
+  isActive?: boolean
+  _count?: { educators: number }
 }
 
-let nextId = 100
-
-export default function AdminSchoolsScreen() {
-  const [schools, setSchools] = useState<School[]>([
-    { id: '1', name: 'Nairobi Care Academy', location: 'Nairobi, Kenya', educatorCount: 3, createdAt: new Date().toISOString() },
-    { id: '2', name: 'Mombasa Nursing Institute', location: 'Mombasa, Kenya', educatorCount: 2, createdAt: new Date().toISOString() },
-  ])
-
+export default function AdminSchoolsScreen({ navigation }: Props) {
+  const { token } = useAuth()
+  const [schools, setSchools] = useState<School[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newLocation, setNewLocation] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState('')
+  const [location, setLocation] = useState('')
+  const [county, setCounty] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editLocation, setEditLocation] = useState('')
 
-  function handleAdd() {
-    if (!newName.trim()) {
-      Alert.alert('Name required', 'Please enter a school name.')
-      return
+  const load = useCallback(async () => {
+    if (!token) return
+    try {
+      const res = await fetchAdminSchools(token)
+      if (res.success) setSchools(res.data ?? [])
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load schools')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-    const school: School = {
-      id: String(nextId++),
-      name: newName.trim(),
-      location: newLocation.trim() || 'Kenya',
-      educatorCount: 0,
-      createdAt: new Date().toISOString(),
-    }
-    setSchools((prev) => [school, ...prev])
-    setNewName('')
-    setNewLocation('')
+  }, [token])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function resetForm() {
+    setName('')
+    setLocation('')
+    setCounty('')
+    setEditingId(null)
     setShowForm(false)
   }
 
   function startEdit(school: School) {
     setEditingId(school.id)
-    setEditName(school.name)
-    setEditLocation(school.location)
+    setName(school.name)
+    setLocation(school.location || '')
+    setCounty(school.county || '')
+    setShowForm(true)
   }
 
-  function saveEdit() {
-    if (!editName.trim()) return
-    setSchools((prev) =>
-      prev.map((s) =>
-        s.id === editingId ? { ...s, name: editName.trim(), location: editLocation.trim() || s.location } : s
-      )
-    )
-    setEditingId(null)
+  async function handleSave() {
+    if (!token || !name.trim()) {
+      Alert.alert('Name required', 'Please enter a school name.')
+      return
+    }
+    setSaving(true)
+    try {
+      if (editingId) {
+        await updateAdminSchool(token, editingId, {
+          name: name.trim(),
+          location: location.trim() || undefined,
+          county: county.trim() || undefined,
+        })
+      } else {
+        await createAdminSchool(token, {
+          name: name.trim(),
+          location: location.trim() || undefined,
+          county: county.trim() || undefined,
+        })
+      }
+      resetForm()
+      await load()
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save school')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleDelete(school: School) {
+    if (!token) return
     Alert.alert('Delete School', `Delete "${school.name}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => setSchools((prev) => prev.filter((s) => s.id !== school.id)),
+        onPress: async () => {
+          try {
+            await deleteAdminSchool(token, school.id)
+            load()
+          } catch (err) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Delete failed')
+          }
+        },
       },
     ])
   }
 
+  async function toggleActive(school: School) {
+    if (!token) return
+    try {
+      await updateAdminSchool(token, school.id, { isActive: !(school.isActive !== false) })
+      load()
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Update failed')
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>School Manager</Text>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => setShowForm((v) => !v)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.addBtnText}>{showForm ? '✕ Cancel' : '+ Add School'}</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.back}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Schools</Text>
+        <TouchableOpacity
+          onPress={() => {
+            if (showForm) resetForm()
+            else {
+              setEditingId(null)
+              setShowForm(true)
+            }
+          }}
+        >
+          <Text style={styles.add}>{showForm ? 'Cancel' : '+ Add'}</Text>
+        </TouchableOpacity>
+      </View>
 
-        <Text style={styles.subtitle}>Manage schools and their educator assignments.</Text>
-
-        {/* Add form */}
-        {showForm && (
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>New School</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="School name"
-              placeholderTextColor="#94a3b8"
-              value={newName}
-              onChangeText={setNewName}
+      {loading ? (
+        <ActivityIndicator color="#2563eb" style={{ marginTop: 24 }} />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.container}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true)
+                load()
+              }}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Location (e.g. Nairobi, Kenya)"
-              placeholderTextColor="#94a3b8"
-              value={newLocation}
-              onChangeText={setNewLocation}
-            />
-            <TouchableOpacity
-              style={[styles.saveBtn, !newName.trim() && styles.btnDisabled]}
-              onPress={handleAdd}
-              disabled={!newName.trim()}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.saveBtnText}>Add School</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* School list */}
-        <Text style={styles.sectionTitle}>{schools.length} School{schools.length !== 1 ? 's' : ''}</Text>
-
-        {schools.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🏫</Text>
-            <Text style={styles.emptyText}>No schools yet. Add one above.</Text>
-          </View>
-        ) : (
-          schools.map((school) => (
-            <View key={school.id} style={styles.schoolCard}>
-              {editingId === school.id ? (
-                <View style={styles.editForm}>
-                  <TextInput
-                    style={styles.input}
-                    value={editName}
-                    onChangeText={setEditName}
-                    placeholder="School name"
-                    placeholderTextColor="#94a3b8"
-                  />
-                  <TextInput
-                    style={styles.input}
-                    value={editLocation}
-                    onChangeText={setEditLocation}
-                    placeholder="Location"
-                    placeholderTextColor="#94a3b8"
-                  />
-                  <View style={styles.editActions}>
-                    <TouchableOpacity
-                      style={styles.saveBtn}
-                      onPress={saveEdit}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.saveBtnText}>Save</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.cancelBtn}
-                      onPress={() => setEditingId(null)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.cancelBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.schoolInfo}>
-                    <View style={styles.schoolIconWrap}>
-                      <Text style={styles.schoolIcon}>🏫</Text>
-                    </View>
-                    <View style={styles.schoolDetails}>
-                      <Text style={styles.schoolName}>{school.name}</Text>
-                      <Text style={styles.schoolLocation}>📍 {school.location}</Text>
-                      <Text style={styles.schoolMeta}>{school.educatorCount} educator{school.educatorCount !== 1 ? 's' : ''}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.schoolActions}>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: '#eff6ff' }]}
-                      onPress={() => startEdit(school)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.actionBtnText, { color: '#2563eb' }]}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: '#fff1f2' }]}
-                      onPress={() => handleDelete(school)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
+          }
+        >
+          {showForm ? (
+            <View style={styles.form}>
+              <Text style={styles.label}>{editingId ? 'Edit school' : 'New school'}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="School name"
+                placeholderTextColor="#94a3b8"
+                value={name}
+                onChangeText={setName}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Location"
+                placeholderTextColor="#94a3b8"
+                value={location}
+                onChangeText={setLocation}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="County"
+                placeholderTextColor="#94a3b8"
+                value={county}
+                onChangeText={setCounty}
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+                <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save School'}</Text>
+              </TouchableOpacity>
             </View>
-          ))
-        )}
-      </ScrollView>
+          ) : null}
+
+          {schools.map((school) => (
+            <View key={school.id} style={styles.card}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.name}>{school.name}</Text>
+                <Switch
+                  value={school.isActive !== false}
+                  onValueChange={() => toggleActive(school)}
+                />
+              </View>
+              <Text style={styles.meta}>
+                {[school.location, school.county].filter(Boolean).join(' · ') || 'No location'}
+              </Text>
+              <Text style={styles.meta}>
+                {school._count?.educators ?? 0} educators · {school.studentCount ?? 0} students
+              </Text>
+              <View style={styles.actions}>
+                <TouchableOpacity onPress={() => startEdit(school)}>
+                  <Text style={styles.edit}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(school)}>
+                  <Text style={styles.delete}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+          {schools.length === 0 ? <Text style={styles.empty}>No schools yet</Text> : null}
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }
 
-const shadow = Platform.select({
-  web: { boxShadow: '0 2px 8px rgba(15,23,42,0.06)' } as any,
-  default: { shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-})
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { padding: 20, paddingBottom: 40 },
-  pageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  pageTitle: { fontSize: 26, fontWeight: '800', color: '#0f172a' },
-  addBtn: { backgroundColor: '#2563eb', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
-  addBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
-  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 20 },
-  formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
-    marginBottom: 20,
-    gap: 10,
-    ...shadow,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  formTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
+  back: { color: '#2563eb', fontWeight: '600', marginRight: 12 },
+  title: { flex: 1, fontSize: 17, fontWeight: '700', color: '#0f172a' },
+  add: { color: '#2563eb', fontWeight: '700' },
+  container: { padding: 16, paddingBottom: 32 },
+  form: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    marginBottom: 14,
+  },
+  label: { fontWeight: '700', color: '#0f172a', marginBottom: 10 },
   input: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 14,
+    marginBottom: 10,
     color: '#0f172a',
   },
   saveBtn: {
@@ -248,51 +272,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
-  btnDisabled: { opacity: 0.5 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 40,
-    alignItems: 'center',
-    ...shadow,
+  saveText: { color: '#fff', fontWeight: '700' },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    marginBottom: 8,
   },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyText: { fontSize: 15, color: '#94a3b8' },
-  schoolCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    ...shadow,
-  },
-  schoolInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  schoolIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  schoolIcon: { fontSize: 22 },
-  schoolDetails: { flex: 1 },
-  schoolName: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 3 },
-  schoolLocation: { fontSize: 12, color: '#64748b', marginBottom: 2 },
-  schoolMeta: { fontSize: 12, color: '#94a3b8' },
-  schoolActions: { flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 },
-  actionBtn: { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
-  actionBtnText: { fontSize: 13, fontWeight: '700' },
-  editForm: { gap: 10 },
-  editActions: { flexDirection: 'row', gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-  },
-  cancelBtnText: { color: '#64748b', fontWeight: '600', fontSize: 14 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  name: { fontWeight: '700', color: '#0f172a', flex: 1, marginRight: 8 },
+  meta: { color: '#64748b', fontSize: 12, marginTop: 4 },
+  actions: { flexDirection: 'row', gap: 16, marginTop: 10 },
+  edit: { color: '#2563eb', fontWeight: '700' },
+  delete: { color: '#dc2626', fontWeight: '700' },
+  empty: { textAlign: 'center', color: '#94a3b8', marginTop: 24 },
 })

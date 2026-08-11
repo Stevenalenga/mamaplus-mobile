@@ -1,16 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Text, View } from 'react-native'
 import AdminAssistantHomeScreen from '../screens/admin-assistant/AdminAssistantHomeScreen'
-import CoursesScreen from '../screens/CoursesScreen'
+import BlogScreen from '../screens/BlogScreen'
 import ProfileStackNavigator from './ProfileStackNavigator'
 import { useTabBarScreenOptions } from './useTabBarScreenOptions'
 import { AdminAssistantTabParamList } from '../types'
 
 const Tab = createBottomTabNavigator<AdminAssistantTabParamList>()
-
-function BrowseCoursesScreen() {
-  return <CoursesScreen canEnroll={false} />
-}
 
 function icon(emoji: string, focused: boolean) {
   return (
@@ -31,9 +27,9 @@ export default function AdminAssistantNavigator() {
         options={{ tabBarIcon: ({ focused }) => icon('🏠', focused) }}
       />
       <Tab.Screen
-        name="Courses"
-        component={BrowseCoursesScreen}
-        options={{ tabBarLabel: 'Browse', tabBarIcon: ({ focused }) => icon('📚', focused) }}
+        name="Blog"
+        component={BlogScreen}
+        options={{ tabBarLabel: 'Blog', tabBarIcon: ({ focused }) => icon('📰', focused) }}
       />
       <Tab.Screen
         name="Profile"

@@ -565,3 +565,159 @@ export async function fetchAdminStats(token: string) {
     token
   )
 }
+
+export async function fetchAdminUserDetail(token: string, userId: string) {
+  return request<{ success: boolean; data: any }>(
+    `/api/admin/users/${encodeURIComponent(userId)}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchAdminEnrollments(
+  token: string,
+  params?: { search?: string; status?: string; courseId?: string; page?: number; limit?: number }
+) {
+  const qs = new URLSearchParams()
+  if (params?.search) qs.set('search', params.search)
+  if (params?.status) qs.set('status', params.status)
+  if (params?.courseId) qs.set('courseId', params.courseId)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  return request<{ success: boolean; data: { enrollments: any[]; total: number; page: number; limit: number; totalPages: number } }>(
+    `/api/admin/enrollments${query ? `?${query}` : ''}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function updateAdminEnrollment(
+  token: string,
+  payload: { enrollmentId: string; status?: string; progress?: number }
+) {
+  return request<{ success: boolean; data: any; message?: string }>(
+    '/api/admin/enrollments',
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    token
+  )
+}
+
+export async function fetchAdminPayments(
+  token: string,
+  params?: { search?: string; status?: string; currency?: string; page?: number; limit?: number }
+) {
+  const qs = new URLSearchParams()
+  if (params?.search) qs.set('search', params.search)
+  if (params?.status) qs.set('status', params.status)
+  if (params?.currency) qs.set('currency', params.currency)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  return request<{ success: boolean; data: { payments: any[]; total: number; page: number; limit: number; totalPages: number; summary: any[] } }>(
+    `/api/admin/payments${query ? `?${query}` : ''}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchAdminAgencies(
+  token: string,
+  params?: { search?: string; page?: number; limit?: number }
+) {
+  const qs = new URLSearchParams()
+  if (params?.search) qs.set('search', params.search)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  return request<{ success: boolean; data: { agencies: any[]; total: number; page: number; limit: number; totalPages: number; placementStats: Record<string, number> } }>(
+    `/api/admin/agencies${query ? `?${query}` : ''}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function fetchAdminReviews(token: string, published?: boolean) {
+  const qs =
+    published === undefined ? '' : `?published=${published ? 'true' : 'false'}`
+  return request<{ success: boolean; data: any[] }>(
+    `/api/admin/reviews${qs}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function updateAdminReview(
+  token: string,
+  payload: { reviewId: string; isPublished: boolean }
+) {
+  return request<{ success: boolean; data: any }>(
+    '/api/admin/reviews',
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    token
+  )
+}
+
+export async function deleteAdminReview(token: string, reviewId: string) {
+  return request<{ success: boolean }>(
+    '/api/admin/reviews',
+    { method: 'DELETE', body: JSON.stringify({ reviewId }) },
+    token
+  )
+}
+
+export async function fetchAdminCertificates(token: string, search?: string) {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : ''
+  return request<{ success: boolean; data: any[] }>(
+    `/api/admin/certificates${qs}`,
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function revokeAdminCertificate(token: string, certificateId: string) {
+  return request<{ success: boolean }>(
+    '/api/admin/certificates',
+    { method: 'DELETE', body: JSON.stringify({ certificateId }) },
+    token
+  )
+}
+
+export async function fetchAdminSchools(token: string) {
+  return request<{ success: boolean; data: any[] }>(
+    '/api/admin/schools',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function createAdminSchool(
+  token: string,
+  payload: { name: string; location?: string; county?: string; studentCount?: number; isActive?: boolean }
+) {
+  return request<{ success: boolean; data: any }>(
+    '/api/admin/schools',
+    { method: 'POST', body: JSON.stringify(payload) },
+    token
+  )
+}
+
+export async function updateAdminSchool(
+  token: string,
+  schoolId: string,
+  payload: { name?: string; location?: string; county?: string; studentCount?: number; isActive?: boolean }
+) {
+  return request<{ success: boolean; data: any }>(
+    `/api/admin/schools/${encodeURIComponent(schoolId)}`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    token
+  )
+}
+
+export async function deleteAdminSchool(token: string, schoolId: string) {
+  return request<{ success: boolean; message?: string }>(
+    `/api/admin/schools/${encodeURIComponent(schoolId)}`,
+    { method: 'DELETE' },
+    token
+  )
+}

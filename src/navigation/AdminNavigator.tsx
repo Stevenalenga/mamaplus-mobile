@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Text, View } from 'react-native'
 import AdminHomeScreen from '../screens/admin/AdminHomeScreen'
 import AdminCoursesScreen from '../screens/admin/AdminCoursesScreen'
-import AdminSchoolsScreen from '../screens/admin/AdminSchoolsScreen'
+import AdminManageNavigator from './AdminManageNavigator'
 import ProfileStackNavigator from './ProfileStackNavigator'
 import { AdminTabParamList } from '../types'
 import { useTabBarScreenOptions } from './useTabBarScreenOptions'
@@ -33,9 +33,9 @@ export default function AdminNavigator() {
         options={{ tabBarLabel: 'Courses', tabBarIcon: ({ focused }) => icon('📚', focused) }}
       />
       <Tab.Screen
-        name="Schools"
-        component={AdminSchoolsScreen}
-        options={{ tabBarLabel: 'Schools', tabBarIcon: ({ focused }) => icon('🏫', focused) }}
+        name="Manage"
+        component={AdminManageNavigator}
+        options={{ tabBarLabel: 'Manage', tabBarIcon: ({ focused }) => icon('⚙️', focused) }}
       />
       <Tab.Screen
         name="Profile"
