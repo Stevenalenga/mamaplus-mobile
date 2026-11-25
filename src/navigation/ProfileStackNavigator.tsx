@@ -7,6 +7,7 @@ import AgencyCaregiversScreen from '../screens/agency/AgencyCaregiversScreen'
 import ContactScreen from '../screens/ContactScreen'
 import BlogScreen from '../screens/BlogScreen'
 import BlogDetailScreen from '../screens/BlogDetailScreen'
+import SessionsScreen from '../screens/SessionsScreen'
 import { ProfileStackParamList } from '../types'
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>()
@@ -27,6 +28,7 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="Contact" component={ContactScreen} />
       <Stack.Screen name="Blog" component={ProfileBlogScreen} />
       <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
+      <Stack.Screen name="Sessions" component={SessionsScreen} />
       {isAgency ? (
         <Stack.Screen name="AgencyCaregivers" component={AgencyCaregiversScreen} />
       ) : null}

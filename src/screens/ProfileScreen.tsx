@@ -16,6 +16,7 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NavProp>()
   const [stats, setStats] = useState({ courses: 0, completed: 0, payments: 0 })
   const [pushBusy, setPushBusy] = useState(false)
+  const [pushStatus, setPushStatus] = useState<string | null>(null)
 
   const loadStats = useCallback(async () => {
     if (!token) return
@@ -41,9 +42,14 @@ export default function ProfileScreen() {
     setPushBusy(true)
     try {
       const result = await syncPushTokenWithServer(token)
-      if (result.ok) {
-        Alert.alert('Notifications enabled', 'This device is registered for MamaPlus push notifications.')
+      if (result.ok && result.token) {
+        setPushStatus(`Registered: ${result.token}`)
+        Alert.alert(
+          'Notifications enabled',
+          `This device is registered.\n\nToken:\n${result.token}\n\nIf admin still shows 0 devices, the API/database may not be saving tokens. If admin sends OK but nothing arrives, check FCM credentials on Expo.`
+        )
       } else {
+        setPushStatus(result.error || 'Registration failed')
         Alert.alert('Could not enable notifications', result.error || 'Unknown error')
       }
     } finally {
@@ -61,6 +67,7 @@ export default function ProfileScreen() {
       label: pushBusy ? 'Enabling notifications…' : 'Enable notifications',
       onPress: enableNotifications,
     },
+    { icon: '📱', label: 'Active sessions', onPress: () => navigation.navigate('Sessions') },
     ...(isAgency
       ? [{ icon: '👥', label: 'My Caregivers', onPress: () => navigation.navigate('AgencyCaregivers') }]
       : []),
@@ -91,6 +98,7 @@ export default function ProfileScreen() {
             <Text style={styles.roleBadgeText}>{roleLabel}</Text>
           </View>
           {user?.isVerified && <Text style={styles.verifiedText}>✅ Verified Account</Text>}
+          {pushStatus ? <Text style={styles.pushStatus}>{pushStatus}</Text> : null}
         </View>
 
         {user?.role === 'USER' && (
@@ -126,7 +134,7 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
-        <Text style={styles.version}>MamaPlus v1.0.0</Text>
+        <Text style={styles.version}>MamaPlus v1.0.4</Text>
       </ScrollView>
     </SafeAreaView>
   )
@@ -150,6 +158,7 @@ const styles = StyleSheet.create({
   roleBadge: { backgroundColor: '#eff6ff', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 8 },
   roleBadgeText: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
   verifiedText: { fontSize: 13, color: '#16a34a', fontWeight: '600' },
+  pushStatus: { marginTop: 10, fontSize: 11, color: '#64748b', textAlign: 'center', paddingHorizontal: 8 },
   statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, marginBottom: 20, overflow: 'hidden', ...shadow },
   statItem: { flex: 1, alignItems: 'center', paddingVertical: 16, borderRightWidth: 1, borderRightColor: '#f1f5f9' },
   statValue: { fontSize: 22, fontWeight: '800', color: '#2563eb' },

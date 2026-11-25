@@ -3,7 +3,7 @@ export default {
     name: 'MamaPlus',
     slug: 'mamaplus-mobile',
     scheme: 'mamaplus',
-    version: '1.0.3',
+    version: '1.0.4',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
@@ -17,7 +17,7 @@ export default {
     },
     android: {
       package: 'com.mamaplus.mobile',
-      versionCode: 4,
+      versionCode: 5,
       predictiveBackGestureEnabled: false,
       adaptiveIcon: {
         foregroundImage: './assets/android-icon-foreground.png',

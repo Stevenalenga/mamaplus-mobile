@@ -80,8 +80,8 @@ export default function OnboardingScreen() {
               ? ((serverUser?.gender as SelectedGender | undefined) ?? selectedGender ?? null)
               : null,
         }
-        // Persist refreshed JWT so subsequent API calls use the new role
-        updateUser(updatedUser, payload.token)
+        // Persist refreshed JWT + session so subsequent API calls use the new role
+        updateUser(updatedUser, payload.token, payload.session)
         // AppNavigator will automatically re-render and route to the right tab
       } else {
         Alert.alert('Error', 'Something went wrong. Please try again.')

@@ -17,9 +17,22 @@ export interface User {
   gender?: string | null
 }
 
+/** Server-backed login session (from standalone API session management). */
+export interface AuthSession {
+  id: string
+  userAgent: string | null
+  ip: string | null
+  createdAt: string
+  lastSeenAt: string
+  expiresAt: string
+  revokedAt: string | null
+  current: boolean
+}
+
 export interface AuthPayload {
   token: string
   user: User
+  session?: AuthSession
 }
 
 export interface SignUpParams {
@@ -36,8 +49,8 @@ export interface AuthContextState {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (payload: SignUpParams) => Promise<void>
   signOut: () => Promise<void>
-  /** Persist updated user (and optional refreshed token after onboarding). */
-  updateUser: (user: User, nextToken?: string) => void
+  /** Persist updated user (and optional refreshed token/session after onboarding). */
+  updateUser: (user: User, nextToken?: string, session?: AuthSession) => void
 }
 
 // ─── Root stack (auth + onboarding gate) ────────────────────────────────────
@@ -76,6 +89,7 @@ export type ProfileStackParamList = {
   Contact: undefined
   Blog: undefined
   BlogDetail: { slug: string; title?: string }
+  Sessions: undefined
 }
 
 export interface BlogPost {

@@ -54,10 +54,11 @@ export default function LoginScreen({ navigation }: Props) {
 
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="Email or phone number"
             placeholderTextColor="#94a3b8"
             autoCapitalize="none"
-            keyboardType="email-address"
+            keyboardType="default"
+            autoCorrect={false}
             value={email}
             onChangeText={setEmail}
           />

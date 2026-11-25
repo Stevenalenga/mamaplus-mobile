@@ -1,4 +1,4 @@
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import Constants from 'expo-constants'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
@@ -47,7 +47,9 @@ export async function getExpoPushToken(): Promise<string | null> {
     finalStatus = status
   }
   if (finalStatus !== 'granted') {
-    throw new Error('Notification permission was denied. Enable it in phone Settings → Apps → MamaPlus → Notifications.')
+    throw new Error(
+      'Notification permission was denied. Enable it in phone Settings → Apps → MamaPlus → Notifications.'
+    )
   }
 
   const projectId = getProjectId()
@@ -55,11 +57,19 @@ export async function getExpoPushToken(): Promise<string | null> {
     throw new Error('EAS projectId missing; cannot get Expo push token')
   }
 
-  const push = await Notifications.getExpoPushTokenAsync({ projectId })
-  if (!push.data) {
-    throw new Error('Expo did not return a push token')
+  try {
+    const push = await Notifications.getExpoPushTokenAsync({ projectId })
+    if (!push.data) {
+      throw new Error('Expo did not return a push token')
+    }
+    return push.data
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // Common when google-services.json / Firebase Installations / FCM is misconfigured
+    throw new Error(
+      `Could not get Expo push token (${message}). Ensure notification permission is allowed and this build includes google-services.json.`
+    )
   }
-  return push.data
 }
 
 export type PushSyncResult = {
@@ -100,4 +110,32 @@ export async function removePushTokenFromServer(
   } catch (error) {
     console.warn('Failed to unregister push token', error)
   }
+}
+
+/** Wire foreground listeners so alerts also show while the app is open. */
+export function attachNotificationListeners() {
+  const received = Notifications.addNotificationReceivedListener((notification) => {
+    console.info('[MamaPlus] Notification received', notification.request.content.title)
+  })
+  const response = Notifications.addNotificationResponseReceivedListener((resp) => {
+    console.info('[MamaPlus] Notification tapped', resp.notification.request.content.data)
+  })
+  return () => {
+    received.remove()
+    response.remove()
+  }
+}
+
+/** Re-register when the app returns to foreground (permission may have been granted in Settings). */
+export function watchAppStateForPushRegistration(
+  getAuthToken: () => string | null,
+  onResult?: (result: PushSyncResult) => void
+) {
+  const sub = AppState.addEventListener('change', (state) => {
+    if (state !== 'active') return
+    const token = getAuthToken()
+    if (!token) return
+    syncPushTokenWithServer(token).then((result) => onResult?.(result))
+  })
+  return () => sub.remove()
 }

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { API_BASE_URL, AUTH_STORAGE_KEY } from '../constants'
-import { AuthPayload, BlogPost, SignUpParams } from '../types'
+import { AuthPayload, AuthSession, BlogPost, SignUpParams } from '../types'
 
 const isWeb = Platform.OS === 'web'
 
@@ -118,7 +118,15 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(body?.message || 'Request failed')
+    const message = body?.message || 'Request failed'
+    if (response.status === 401) {
+      throw new Error(
+        message === 'Not authenticated' || message === 'Unauthorized' || message === 'Invalid session'
+          ? 'Session expired. Please sign in again.'
+          : message
+      )
+    }
+    throw new Error(message)
   }
 
   return body as T
@@ -160,12 +168,37 @@ export async function onboardUser(
   role: 'USER' | 'AGENCY' | 'INSTRUCTOR',
   gender?: 'MALE' | 'FEMALE'
 ) {
-  return request<{ success: boolean; data: { user: any; token: string } }>(
+  return request<{ success: boolean; data: AuthPayload }>(
     '/api/users/onboard',
     {
       method: 'POST',
       body: JSON.stringify({ role, gender }),
     },
+    token
+  )
+}
+
+/** Revoke the current server session (standalone API session management). */
+export async function logoutRequest(token: string) {
+  return request<{ success: boolean; message?: string }>(
+    '/api/users/logout',
+    { method: 'POST', body: JSON.stringify({}) },
+    token
+  )
+}
+
+export async function fetchSessions(token: string) {
+  return request<{ success: boolean; data: AuthSession[] }>(
+    '/api/users/sessions',
+    { method: 'GET' },
+    token
+  )
+}
+
+export async function revokeSession(token: string, sessionId: string) {
+  return request<{ success: boolean; message?: string }>(
+    `/api/users/sessions/${encodeURIComponent(sessionId)}`,
+    { method: 'DELETE' },
     token
   )
 }

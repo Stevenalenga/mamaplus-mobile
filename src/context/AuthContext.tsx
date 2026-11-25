@@ -1,12 +1,33 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { AuthContextState, SignUpParams, User } from '../types'
-import { clearAuthData, fetchCurrentUser, loadAuthData, saveAuthData, signInRequest, signUpRequest } from '../api/client'
+import { AuthContextState, AuthSession, SignUpParams, User } from '../types'
 import {
+  clearAuthData,
+  fetchCurrentUser,
+  loadAuthData,
+  logoutRequest,
+  saveAuthData,
+  signInRequest,
+  signUpRequest,
+} from '../api/client'
+import {
+  attachNotificationListeners,
   removePushTokenFromServer,
   syncPushTokenWithServer,
+  watchAppStateForPushRegistration,
 } from '../lib/push-notifications'
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined)
+
+function isSessionExpiredError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return (
+    msg.includes('session expired') ||
+    msg.includes('not authenticated') ||
+    msg.includes('unauthorized') ||
+    msg.includes('invalid session')
+  )
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -25,10 +46,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const fresh = await fetchCurrentUser(saved.token)
             if (fresh.success && fresh.data) {
               setUser(fresh.data)
-              saveAuthData({ token: saved.token, user: fresh.data }).catch(() => {})
+              saveAuthData({
+                token: saved.token,
+                user: fresh.data,
+                session: saved.session,
+              }).catch(() => {})
             }
-          } catch {
-            // Keep cached user if refresh fails (offline / expired token handled on next API call)
+          } catch (error) {
+            // Pre-session JWTs and revoked sessions must force re-login
+            if (isSessionExpiredError(error)) {
+              await clearAuthData()
+              setUser(null)
+              setToken(null)
+            }
           }
         }
       } catch (error) {
@@ -41,21 +71,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restore()
   }, [])
 
+  // Foreground notification listeners (once for app lifetime)
+  useEffect(() => attachNotificationListeners(), [])
+
   // Register Expo push token whenever the user is authenticated
   useEffect(() => {
     if (!token || !user || user.role === 'PENDING') return
 
     let cancelled = false
-    syncPushTokenWithServer(token).then((result) => {
-      if (!cancelled && result.ok && result.token) {
+    const applyResult = (result: { ok: boolean; token?: string; error?: string }) => {
+      if (cancelled) return
+      if (result.ok && result.token) {
         expoPushTokenRef.current = result.token
-      } else if (!cancelled && result.error) {
+      } else if (result.error) {
         console.warn('[MamaPlus] Push registration:', result.error)
       }
-    })
+    }
+
+    syncPushTokenWithServer(token).then(applyResult)
+    const stopWatch = watchAppStateForPushRegistration(() => token, applyResult)
 
     return () => {
       cancelled = true
+      stopWatch()
     }
   }, [token, user?.id, user?.role])
 
@@ -80,8 +118,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    if (token) {
-      await removePushTokenFromServer(token, expoPushTokenRef.current)
+    const authToken = token
+    if (authToken) {
+      try {
+        await removePushTokenFromServer(authToken, expoPushTokenRef.current)
+      } catch {
+        // Continue logout even if push unregister fails
+      }
+      try {
+        await logoutRequest(authToken)
+      } catch {
+        // Local sign-out still proceeds if server revoke fails
+      }
       expoPushTokenRef.current = null
     }
     await clearAuthData()
@@ -89,15 +137,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null)
   }
 
-  /** Updates the in-memory user (and optional refreshed token after onboarding). */
-  const updateUser = (updatedUser: User, nextToken?: string) => {
+  /** Updates the in-memory user (and optional refreshed token/session after onboarding). */
+  const updateUser = (updatedUser: User, nextToken?: string, session?: AuthSession) => {
     const authToken = nextToken ?? token
     setUser(updatedUser)
     if (nextToken) {
       setToken(nextToken)
     }
     if (authToken) {
-      saveAuthData({ token: authToken, user: updatedUser }).catch((error) => {
+      saveAuthData({ token: authToken, user: updatedUser, session }).catch((error) => {
         console.warn('Failed to persist updated user', error)
       })
     }

@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Platform } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+// Ensure notification handler is registered as early as possible
+import './src/lib/push-notifications'
 import { AuthProvider, useAuth } from './src/context/AuthContext'
 import LoadingScreen from './src/screens/LoadingScreen'
 import LoginScreen from './src/screens/LoginScreen'
