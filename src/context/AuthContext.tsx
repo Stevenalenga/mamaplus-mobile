@@ -1,6 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthContextState, SignUpParams, User } from '../types'
 import { clearAuthData, fetchCurrentUser, loadAuthData, saveAuthData, signInRequest, signUpRequest } from '../api/client'
+import {
+  removePushTokenFromServer,
+  syncPushTokenWithServer,
+} from '../lib/push-notifications'
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined)
 
@@ -8,6 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const expoPushTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     async function restore() {
@@ -36,6 +41,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restore()
   }, [])
 
+  // Register Expo push token whenever the user is authenticated
+  useEffect(() => {
+    if (!token || !user || user.role === 'PENDING') return
+
+    let cancelled = false
+    syncPushTokenWithServer(token).then((result) => {
+      if (!cancelled && result.ok && result.token) {
+        expoPushTokenRef.current = result.token
+      } else if (!cancelled && result.error) {
+        console.warn('[MamaPlus] Push registration:', result.error)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [token, user?.id, user?.role])
+
   const signIn = async (email: string, password: string) => {
     const response = await signInRequest(email, password)
     const auth = response.data
@@ -57,6 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    if (token) {
+      await removePushTokenFromServer(token, expoPushTokenRef.current)
+      expoPushTokenRef.current = null
+    }
     await clearAuthData()
     setUser(null)
     setToken(null)

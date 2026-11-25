@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useAuth } from '../context/AuthContext'
 import { ROLE_DISPLAY_NAMES } from '../constants'
 import { fetchCurrentUser, fetchEnrollments } from '../api/client'
+import { syncPushTokenWithServer } from '../lib/push-notifications'
 import { ProfileStackParamList } from '../types'
 
 type NavProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>
@@ -14,6 +15,7 @@ export default function ProfileScreen() {
   const { user, token, signOut } = useAuth()
   const navigation = useNavigation<NavProp>()
   const [stats, setStats] = useState({ courses: 0, completed: 0, payments: 0 })
+  const [pushBusy, setPushBusy] = useState(false)
 
   const loadStats = useCallback(async () => {
     if (!token) return
@@ -34,11 +36,31 @@ export default function ProfileScreen() {
     loadStats()
   }, [loadStats])
 
+  const enableNotifications = useCallback(async () => {
+    if (!token) return
+    setPushBusy(true)
+    try {
+      const result = await syncPushTokenWithServer(token)
+      if (result.ok) {
+        Alert.alert('Notifications enabled', 'This device is registered for MamaPlus push notifications.')
+      } else {
+        Alert.alert('Could not enable notifications', result.error || 'Unknown error')
+      }
+    } finally {
+      setPushBusy(false)
+    }
+  }, [token])
+
   const roleLabel = user ? (ROLE_DISPLAY_NAMES[user.role] ?? user.role) : ''
   const isAgency = user?.role === 'AGENCY'
 
   const menuItems = [
     { icon: '✏️', label: 'Edit Profile', onPress: () => navigation.navigate('EditProfile') },
+    {
+      icon: '🔔',
+      label: pushBusy ? 'Enabling notifications…' : 'Enable notifications',
+      onPress: enableNotifications,
+    },
     ...(isAgency
       ? [{ icon: '👥', label: 'My Caregivers', onPress: () => navigation.navigate('AgencyCaregivers') }]
       : []),

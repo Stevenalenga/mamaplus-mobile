@@ -714,6 +714,30 @@ export async function updateAdminSchool(
   )
 }
 
+// ─── Push Notifications ──────────────────────────────────────────────────────
+
+export async function registerPushToken(
+  token: string,
+  payload: { token: string; platform: 'ios' | 'android' | 'web'; deviceId?: string }
+) {
+  return request<{ success: boolean; data: { id: string; token: string; platform: string } }>(
+    '/api/users/push-token',
+    { method: 'POST', body: JSON.stringify(payload) },
+    token
+  )
+}
+
+export async function unregisterPushToken(token: string, expoPushToken?: string) {
+  return request<{ success: boolean; message?: string }>(
+    '/api/users/push-token',
+    {
+      method: 'DELETE',
+      body: JSON.stringify(expoPushToken ? { token: expoPushToken } : {}),
+    },
+    token
+  )
+}
+
 export async function deleteAdminSchool(token: string, schoolId: string) {
   return request<{ success: boolean; message?: string }>(
     `/api/admin/schools/${encodeURIComponent(schoolId)}`,

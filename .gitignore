@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# Firebase / FCM private keys (google-services.json is OK to commit)
+*-firebase-adminsdk-*.json
+fcm-service-account.json
+
 # typescript
 *.tsbuildinfo
 

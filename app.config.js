@@ -1,9 +1,9 @@
 export default {
   expo: {
-    name: 'MamaPlus Mobile',
+    name: 'MamaPlus',
     slug: 'mamaplus-mobile',
     scheme: 'mamaplus',
-    version: '1.0.0',
+    version: '1.0.3',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
@@ -17,13 +17,16 @@ export default {
     },
     android: {
       package: 'com.mamaplus.mobile',
+      versionCode: 4,
       predictiveBackGestureEnabled: false,
       adaptiveIcon: {
         foregroundImage: './assets/android-icon-foreground.png',
         backgroundImage: './assets/android-icon-background.png',
         monochromeImage: './assets/android-icon-monochrome.png',
-        backgroundColor: '#E6F4FE'
-      }
+        backgroundColor: '#FFF8F5'
+      },
+      // Firebase Android client config (package must match com.mamaplus.mobile)
+      googleServicesFile: './google-services.json'
     },
     androidStatusBar: {
       barStyle: 'dark-content',
@@ -38,10 +41,17 @@ export default {
       [
         'expo-splash-screen',
         {
-          backgroundColor: '#ffffff',
-          image: './assets/logo.png',
+          backgroundColor: '#FFF8F5',
+          image: './assets/splash-icon.png',
           resizeMode: 'contain',
           imageWidth: 220
+        }
+      ],
+      [
+        'expo-notifications',
+        {
+          color: '#E85D4C',
+          defaultChannel: 'default',
         }
       ]
     ],

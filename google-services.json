@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "29827003924",
+    "project_id": "mamaplus-1149a",
+    "storage_bucket": "mamaplus-1149a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:29827003924:android:a540f0e09a83a21f355901",
+        "android_client_info": {
+          "package_name": "com.mamaplus.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxerat60C3BzdJzZnZAG7H2RjuqfLG_IU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
